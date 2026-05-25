@@ -13,6 +13,22 @@ class WebHookJsonFormatSpec extends AnyFunSuite {
     assert(json == expected.replaceAll("\n", ""))
   }
 
+  // Verifies that real webhook payloads carry a non-zero repository id, reflecting the
+  // post-migration state where every repository has a DB-assigned auto-increment id.
+  test("webhook payload includes non-zero repository id") {
+    assert(apiRepository.id != 0)
+    val json = JsonFormat(
+      WebHookIssuesPayload(
+        action = "opened",
+        number = 1,
+        repository = apiRepository,
+        issue = apiIssue,
+        sender = apiUser
+      )
+    )
+    assert(json.contains(s""""id":${apiRepository.id}"""))
+  }
+
   test("WebHookCreatePayload") {
     val payload = WebHookCreatePayload(
       sender = account,
