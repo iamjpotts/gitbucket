@@ -136,6 +136,60 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
     }
   }
 
+  /** Rename a repository via the web settings form. */
+  def renameRepository(owner: String, oldName: String, newName: String, login: String, password: String): Unit = {
+    Using.resource(HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build()) { httpClient =>
+      val signin = new HttpPost(s"http://localhost:$port/signin")
+      signin.setEntity(
+        new UrlEncodedFormEntity(
+          JArrays.asList(
+            new BasicNameValuePair("userName", login),
+            new BasicNameValuePair("password", password)
+          )
+        )
+      )
+      val signinResponse = httpClient.execute(signin)
+      EntityUtils.consume(signinResponse.getEntity)
+      assert(signinResponse.getStatusLine.getStatusCode < 400, "signin failed")
+
+      val rename = new HttpPost(s"http://localhost:$port/$owner/$oldName/settings/rename")
+      rename.setEntity(
+        new UrlEncodedFormEntity(
+          JArrays.asList(
+            new BasicNameValuePair("repositoryName", newName)
+          )
+        )
+      )
+      val renameResponse = httpClient.execute(rename)
+      EntityUtils.consume(renameResponse.getEntity)
+      assert(renameResponse.getStatusLine.getStatusCode == 302, "rename request failed")
+    }
+  }
+
+  /** Delete a repository via the web settings form. */
+  def deleteRepository(owner: String, name: String, login: String, password: String): Unit = {
+    Using.resource(HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build()) { httpClient =>
+      val signin = new HttpPost(s"http://localhost:$port/signin")
+      signin.setEntity(
+        new UrlEncodedFormEntity(
+          JArrays.asList(
+            new BasicNameValuePair("userName", login),
+            new BasicNameValuePair("password", password)
+          )
+        )
+      )
+      val signinResponse = httpClient.execute(signin)
+      EntityUtils.consume(signinResponse.getEntity)
+      assert(signinResponse.getStatusLine.getStatusCode < 400, "signin failed")
+
+      val delete = new HttpPost(s"http://localhost:$port/$owner/$name/settings/delete")
+      delete.setEntity(new UrlEncodedFormEntity(JArrays.asList()))
+      val deleteResponse = httpClient.execute(delete)
+      EntityUtils.consume(deleteResponse.getEntity)
+      assert(deleteResponse.getStatusLine.getStatusCode == 302, "delete request failed")
+    }
+  }
+
   /** Fork a repository via the REST API; returns the HTTP status code. */
   def forkRepositoryViaApi(
     owner: String,

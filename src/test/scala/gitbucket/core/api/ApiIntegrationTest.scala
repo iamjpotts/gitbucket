@@ -366,6 +366,50 @@ class ApiIntegrationTest extends AnyFunSuite {
     }
   }
 
+  test("renaming an origin repository cascades to its forks' origin references") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      server.createUser("user5", "user5pass", "user5@example.com", "root", "root")
+
+      github.createRepository("cascade-origin").autoInit(true).create()
+      server.forkRepository("root", "cascade-origin", "user5", "user5pass")
+      server.waitForRepository(server.client("user5", "user5pass"), "user5/cascade-origin")
+
+      server.renameRepository("root", "cascade-origin", "cascade-renamed", "root", "root")
+
+      // The origin is accessible under the new name
+      val renamed = github.getRepository("root/cascade-renamed")
+      assert(renamed.getFullName == "root/cascade-renamed")
+
+      // The fork is still accessible under its original name
+      val fork = server.client("user5", "user5pass").getRepository("user5/cascade-origin")
+      assert(fork.getFullName == "user5/cascade-origin")
+
+      // forks_count on the renamed origin is 1 only if the fork's ORIGIN_REPOSITORY_NAME
+      // was updated to "cascade-renamed" by ON UPDATE CASCADE; stale pointers would cause
+      // getForkedCount("root", "cascade-renamed") to return 0
+      assert(renamed.getForksCount() == 1)
+    }
+  }
+
+  test("deleting an origin repository does not delete its forks") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      server.createUser("user6", "user6pass", "user6@example.com", "root", "root")
+
+      github.createRepository("delete-origin").autoInit(true).create()
+      server.forkRepository("root", "delete-origin", "user6", "user6pass")
+      server.waitForRepository(server.client("user6", "user6pass"), "user6/delete-origin")
+
+      // Deleting the origin must not cascade-delete the fork (ON DELETE SET NULL, not CASCADE)
+      server.deleteRepository("root", "delete-origin", "root", "root")
+
+      val fork = server.client("user6", "user6pass").getRepository("user6/delete-origin")
+      assert(fork.getFullName == "user6/delete-origin")
+      assert(fork.getId != 0)
+    }
+  }
+
   test("fork repository has a different ID than its origin") {
     Using.resource(new TestingGitBucketServer(19999)) { server =>
       val github = server.client("root", "root")
