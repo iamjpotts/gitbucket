@@ -1,6 +1,8 @@
 package gitbucket.core.service
 
 import gitbucket.core.model.*
+import gitbucket.core.model.Profile.*
+import gitbucket.core.model.Profile.profile.blockingApi.*
 import org.scalatest.funsuite.AnyFunSuite
 
 class RepositoryServiceSpec extends AnyFunSuite with ServiceSpecBase with RepositoryService with AccountService {
@@ -34,6 +36,41 @@ class RepositoryServiceSpec extends AnyFunSuite with ServiceSpecBase with Reposi
         service.getProtectedBranchInfo("tester", "repo2", "branch") == orgPbi
           .copy(owner = "tester", repository = "repo2")
       )
+    }
+  }
+
+  test("renameRepository preserves the repository id") {
+    withTestDB { implicit session =>
+      generateNewAccount("tester")
+      insertRepository("repo", "root", None, false, "main")
+
+      val originalId = Repositories.filter(_.byRepository("root", "repo")).first.repositoryId
+      assert(originalId != 0)
+
+      renameRepository("root", "repo", "tester", "repo2")
+
+      val renamedId = Repositories.filter(_.byRepository("tester", "repo2")).first.repositoryId
+      assert(renamedId == originalId)
+    }
+  }
+
+  // forceInsert (used by renameRepository to preserve the id) bypasses H2's auto-increment
+  // counter. If H2 does not advance its sequence past the force-inserted value, the next
+  // ordinary insert could generate an id already in use, violating the unique constraint.
+  test("new repository created after rename does not reuse the renamed repository's id") {
+    withTestDB { implicit session =>
+      generateNewAccount("tester")
+      insertRepository("repo", "root", None, false, "main")
+
+      val originalId = Repositories.filter(_.byRepository("root", "repo")).first.repositoryId
+
+      renameRepository("root", "repo", "tester", "repo2")
+
+      insertRepository("repo3", "root", None, false, "main")
+      val newId = Repositories.filter(_.byRepository("root", "repo3")).first.repositoryId
+
+      assert(newId != 0)
+      assert(newId != originalId)
     }
   }
 }
