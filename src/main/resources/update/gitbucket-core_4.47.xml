@@ -22,7 +22,7 @@
 
   <createTable tableName="REPOSITORY_2">
     <!-- new column -->
-    <column name="REPOSITORY_ID" type="int" nullable="false" autoIncrement="true" unique="true" />
+    <column name="REPOSITORY_ID" type="int" nullable="false" autoIncrement="true" unique="false" />
 
     <!-- from 4.0 migration -->
     <column name="USER_NAME" type="varchar(100)" nullable="false"/>
@@ -58,6 +58,8 @@
     <!-- from 4.36 migration -->
     <column name="SAFE_MODE" type="boolean" nullable="false" defaultValue="true"/>
   </createTable>
+
+  <addUniqueConstraint constraintName="IDX_REPOSITORY_ID" tableName="REPOSITORY" columnNames="REPOSITORY_ID"/>
 
   <sql>
     INSERT INTO REPOSITORY_2
