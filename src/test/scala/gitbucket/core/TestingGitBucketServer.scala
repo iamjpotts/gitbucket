@@ -106,8 +106,7 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
     }
   }
 
-  /** Fork a repository as the given user. Uses the web fork endpoint because
-   *  GitBucket does not yet expose a REST API for forking. */
+  /** Fork a repository as the given user via the web UI form endpoint. */
   def forkRepository(owner: String, repository: String, asLogin: String, asPassword: String): Unit = {
     Using.resource(HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build()) { httpClient =>
       val signin = new HttpPost(s"http://localhost:$port/signin")
