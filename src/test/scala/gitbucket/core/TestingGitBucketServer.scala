@@ -86,6 +86,26 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
     }
   }
 
+  /** Create an organization via the admin REST API. */
+  def createOrganization(login: String, adminLogin: String, adminPassword: String): Unit = {
+    HttpClientUtil.withHttpClient(None) { httpClient =>
+      val post = new HttpPost(s"http://localhost:$port/api/v3/admin/organizations")
+      val credentials = Base64.getEncoder.encodeToString(s"$adminLogin:$adminPassword".getBytes("UTF-8"))
+      post.setHeader("Authorization", s"Basic $credentials")
+      post.setHeader("Content-Type", "application/json")
+      post.setEntity(
+        new StringEntity(
+          s"""{"login":"$login","admin":"$adminLogin"}""",
+          "UTF-8"
+        )
+      )
+      val response = httpClient.execute(post)
+      EntityUtils.consume(response.getEntity)
+      val status = response.getStatusLine.getStatusCode
+      assert(status == 200, s"createOrganization failed with status $status")
+    }
+  }
+
   /** Fork a repository as the given user. Uses the web fork endpoint because
    *  GitBucket does not yet expose a REST API for forking. */
   def forkRepository(owner: String, repository: String, asLogin: String, asPassword: String): Unit = {
@@ -113,7 +133,7 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
       )
       val forkResponse = httpClient.execute(fork)
       EntityUtils.consume(forkResponse.getEntity)
-      assert(forkResponse.getStatusLine.getStatusCode < 400, "fork request failed")
+      assert(forkResponse.getStatusLine.getStatusCode == 302, "fork request failed")
     }
   }
 

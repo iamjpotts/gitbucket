@@ -283,6 +283,15 @@ class ApiIntegrationTest extends AnyFunSuite {
     }
   }
 
+  test("organization repository ID is non-zero") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      server.createOrganization("testorg", "root", "root")
+      val repo = github.getOrganization("testorg").createRepository("org_repo").autoInit(true).create()
+      assert(repo.getId != 0)
+    }
+  }
+
   test("repository IDs are non-zero and distinct") {
     Using.resource(new TestingGitBucketServer(19999)) { server =>
       val github = server.client("root", "root")
