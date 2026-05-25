@@ -229,18 +229,20 @@ trait ApiRepositoryControllerBase extends ControllerBase {
 
           if (targetAccountOpt.isDefined && getAccountByUserName(targetAccount).isEmpty) {
             NotFound()
-          } else if (getRepository(targetAccount, repositoryName).isDefined) {
-            val existingFork = getRepository(targetAccount, repositoryName).get
-            JsonFormat(ApiRepository(existingFork, ApiUser(getAccountByUserName(targetAccount).get)))
-          } else if (!canCreateRepository(targetAccount, loginAccount)) {
-            Forbidden()
           } else {
-            val f = forkRepository(targetAccount, repository, loginAccount.userName)
-            Await.result(f, Duration.Inf)
-            val fork = Database() withTransaction { implicit session =>
-              getRepository(targetAccount, repositoryName)(session).get
+            val existingForkOpt = getRepository(targetAccount, repositoryName)
+            if (existingForkOpt.isDefined) {
+              JsonFormat(ApiRepository(existingForkOpt.get, ApiUser(getAccountByUserName(targetAccount).get)))
+            } else if (!canCreateRepository(targetAccount, loginAccount)) {
+              Forbidden()
+            } else {
+              val f = forkRepository(targetAccount, repository, loginAccount.userName)
+              Await.result(f, Duration.Inf)
+              val fork = Database() withTransaction { implicit session =>
+                getRepository(targetAccount, repositoryName)(session).get
+              }
+              Accepted(JsonFormat(ApiRepository(fork, ApiUser(getAccountByUserName(targetAccount).get))))
             }
-            Accepted(JsonFormat(ApiRepository(fork, ApiUser(getAccountByUserName(targetAccount).get))))
           }
         }
     }
