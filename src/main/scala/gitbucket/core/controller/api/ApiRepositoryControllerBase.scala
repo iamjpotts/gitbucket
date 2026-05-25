@@ -8,7 +8,7 @@ import gitbucket.core.util._
 import gitbucket.core.util.Implicits._
 import gitbucket.core.model.Profile.profile.blockingApi._
 import org.eclipse.jgit.api.Git
-import org.scalatra.Forbidden
+import org.scalatra.{Accepted, Forbidden}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
@@ -57,6 +57,18 @@ trait ApiRepositoryControllerBase extends ControllerBase {
     JsonFormat(getPublicRepositories().map { r =>
       ApiRepository(r, getAccountByUserName(r.owner).get)
     })
+  }
+
+  /**
+   * Get a repository by its numeric id
+   * https://docs.github.com/en/rest/repos/repos#get-a-repository
+   */
+  get("/api/v3/repositories/:id") {
+    params("id").toIntOption.flatMap { id =>
+      getRepositoryById(id)
+        .filter(r => isReadable(r.repository, context.loginAccount))
+        .map(r => JsonFormat(ApiRepository(r, ApiUser(getAccountByUserName(r.owner).get))))
+    } getOrElse NotFound()
   }
 
   /*
@@ -143,6 +155,42 @@ trait ApiRepositoryControllerBase extends ControllerBase {
    */
   get("/api/v3/repos/:owner/:repository")(referrersOnly { repository =>
     JsonFormat(ApiRepository(repository, ApiUser(getAccountByUserName(repository.owner).get)))
+  })
+
+  /**
+   * Fork a repository
+   * https://docs.github.com/en/rest/repos/forks#create-a-fork
+   */
+  post("/api/v3/repos/:owner/:repository/forks")(usersOnly {
+    val loginAccount = context.loginAccount.get
+    val owner = params("owner")
+    val repositoryName = params("repository")
+
+    getRepository(owner, repositoryName).filter(r => isReadable(r.repository, Some(loginAccount))) match {
+      case None             => NotFound()
+      case Some(repository) =>
+        if (!repository.repository.options.allowFork) {
+          Forbidden()
+        } else {
+          val targetAccount = extractFromJsonBody[CreateAFork]
+            .flatMap(_.organization)
+            .getOrElse(loginAccount.userName)
+
+          if (getRepository(targetAccount, repositoryName).isDefined) {
+            val existingFork = getRepository(targetAccount, repositoryName).get
+            JsonFormat(ApiRepository(existingFork, ApiUser(getAccountByUserName(targetAccount).get)))
+          } else if (!canCreateRepository(targetAccount, loginAccount)) {
+            Forbidden()
+          } else {
+            val f = forkRepository(targetAccount, repository, loginAccount.userName)
+            Await.result(f, Duration.Inf)
+            val fork = Database() withTransaction { implicit session =>
+              getRepository(targetAccount, repositoryName)(session).get
+            }
+            Accepted(JsonFormat(ApiRepository(fork, ApiUser(getAccountByUserName(targetAccount).get))))
+          }
+        }
+    }
   })
 
   /*

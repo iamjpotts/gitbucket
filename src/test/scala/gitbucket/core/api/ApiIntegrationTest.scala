@@ -283,6 +283,31 @@ class ApiIntegrationTest extends AnyFunSuite {
     }
   }
 
+  test("GET /repositories/:id returns the repository") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      val repo = github.createRepository("id_lookup_test").autoInit(true).create()
+      val id = repo.getId
+
+      val found = github.getRepositoryById(id)
+      assert(found.getFullName == repo.getFullName)
+    }
+  }
+
+  test("POST /repos/:owner/:repo/forks creates a fork via REST API") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      val base = github.createRepository("fork_api_origin").autoInit(true).create()
+
+      server.createUser("user3", "user3pass", "user3@example.com", "root", "root")
+      val fork = server.client("user3", "user3pass").getRepository("root/fork_api_origin").createFork().create()
+
+      assert(fork.getId != 0)
+      assert(fork.getId != base.getId)
+      assert(fork.getFullName == "user3/fork_api_origin")
+    }
+  }
+
   test("organization repository ID is non-zero") {
     Using.resource(new TestingGitBucketServer(19999)) { server =>
       val github = server.client("root", "root")
