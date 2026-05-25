@@ -136,6 +136,27 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
     }
   }
 
+  /** Fork a repository via the REST API; returns the HTTP status code. */
+  def forkRepositoryViaApi(
+    owner: String,
+    repository: String,
+    organization: Option[String],
+    login: String,
+    password: String
+  ): Int = {
+    HttpClientUtil.withHttpClient(None) { httpClient =>
+      val post = new HttpPost(s"http://localhost:$port/api/v3/repos/$owner/$repository/forks")
+      val credentials = Base64.getEncoder.encodeToString(s"$login:$password".getBytes("UTF-8"))
+      post.setHeader("Authorization", s"Basic $credentials")
+      post.setHeader("Content-Type", "application/json")
+      val body = organization.map(org => s"""{"organization":"$org"}""").getOrElse("{}")
+      post.setEntity(new StringEntity(body, "UTF-8"))
+      val response = httpClient.execute(post)
+      EntityUtils.consume(response.getEntity)
+      response.getStatusLine.getStatusCode
+    }
+  }
+
   /** Wait for a repository to appear via the API. Forking is asynchronous so
    *  callers cannot rely on the fork POST completing synchronously. */
   def waitForRepository(client: GitHub, fullName: String, timeoutMillis: Long = 10000): GHRepository = {

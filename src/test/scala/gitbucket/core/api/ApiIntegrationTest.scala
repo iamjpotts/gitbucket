@@ -308,6 +308,18 @@ class ApiIntegrationTest extends AnyFunSuite {
     }
   }
 
+  test("POST /repos/:owner/:repo/forks with non-existent organization returns 404") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      server.createUser("user4", "user4pass", "user4@example.com", "root", "root")
+      val github = server.client("root", "root")
+      github.createRepository("fork_bad_org_test").autoInit(true).create()
+
+      val status =
+        server.forkRepositoryViaApi("root", "fork_bad_org_test", Some("does_not_exist"), "user4", "user4pass")
+      assert(status == 404, s"Expected 404 for non-existent organization but got $status")
+    }
+  }
+
   test("organization repository ID is non-zero") {
     Using.resource(new TestingGitBucketServer(19999)) { server =>
       val github = server.client("root", "root")

@@ -224,11 +224,12 @@ trait ApiRepositoryControllerBase extends ControllerBase {
         if (!repository.repository.options.allowFork) {
           Forbidden()
         } else {
-          val targetAccount = extractFromJsonBody[CreateAFork]
-            .flatMap(_.organization)
-            .getOrElse(loginAccount.userName)
+          val targetAccountOpt = extractFromJsonBody[CreateAFork].flatMap(_.organization)
+          val targetAccount = targetAccountOpt.getOrElse(loginAccount.userName)
 
-          if (getRepository(targetAccount, repositoryName).isDefined) {
+          if (targetAccountOpt.isDefined && getAccountByUserName(targetAccount).isEmpty) {
+            NotFound()
+          } else if (getRepository(targetAccount, repositoryName).isDefined) {
             val existingFork = getRepository(targetAccount, repositoryName).get
             JsonFormat(ApiRepository(existingFork, ApiUser(getAccountByUserName(targetAccount).get)))
           } else if (!canCreateRepository(targetAccount, loginAccount)) {
