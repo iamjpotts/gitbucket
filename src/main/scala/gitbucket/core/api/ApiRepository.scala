@@ -5,6 +5,7 @@ import gitbucket.core.service.RepositoryService.RepositoryInfo
 
 // https://developer.github.com/v3/repos/
 case class ApiRepository(
+  id: Long,
   name: String,
   full_name: String,
   description: String,
@@ -13,8 +14,7 @@ case class ApiRepository(
   `private`: Boolean,
   default_branch: String,
   owner: ApiUser,
-  has_issues: Boolean,
-  id: Long
+  has_issues: Boolean
 ) {
   val forks_count = forks
   val watchers_count = watchers

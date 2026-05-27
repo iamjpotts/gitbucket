@@ -507,6 +507,7 @@ object ApiSpecModels {
        |}""".stripMargin
 
   val jsonRepository: String = s"""{
+       |"id":1,
        |"name":"Hello-World",
        |"full_name":"octocat/Hello-World",
        |"description":"This your first repo!",
@@ -516,7 +517,6 @@ object ApiSpecModels {
        |"default_branch":"main",
        |"owner":$jsonUser,
        |"has_issues":true,
-       |"id":1,
        |"forks_count":1,
        |"watchers_count":0,
        |"url":"http://gitbucket.exmple.com/api/v3/repos/octocat/Hello-World",
