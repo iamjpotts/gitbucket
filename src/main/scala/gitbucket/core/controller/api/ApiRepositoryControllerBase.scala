@@ -224,24 +224,24 @@ trait ApiRepositoryControllerBase extends ControllerBase {
         if (!repository.repository.options.allowFork) {
           Forbidden()
         } else {
-          val targetAccountOpt = extractFromJsonBody[CreateAFork].flatMap(_.organization)
-          val targetAccount = targetAccountOpt.getOrElse(loginAccount.userName)
+          val organization = extractFromJsonBody[CreateAFork].flatMap(_.organization)
+          val targetAccount = organization.getOrElse(loginAccount.userName)
 
-          if (targetAccountOpt.isDefined && getAccountByUserName(targetAccount).isEmpty) {
+          if (organization.isDefined && getAccountByUserName(targetAccount).isEmpty) {
             NotFound()
           } else {
-            val existingForkOpt = getRepository(targetAccount, repositoryName)
-            if (existingForkOpt.isDefined) {
-              JsonFormat(ApiRepository(existingForkOpt.get, ApiUser(getAccountByUserName(targetAccount).get)))
-            } else if (!canCreateRepository(targetAccount, loginAccount)) {
-              Forbidden()
-            } else {
-              val f = forkRepository(targetAccount, repository, loginAccount.userName)
-              Await.result(f, Duration.Inf)
-              val fork = Database() withTransaction { implicit session =>
-                getRepository(targetAccount, repositoryName)(session).get
-              }
-              Accepted(JsonFormat(ApiRepository(fork, ApiUser(getAccountByUserName(targetAccount).get))))
+            getRepository(targetAccount, repositoryName) match {
+              case Some(existingFork) =>
+                JsonFormat(ApiRepository(existingFork, ApiUser(getAccountByUserName(targetAccount).get)))
+              case None if !canCreateRepository(targetAccount, loginAccount) =>
+                Forbidden()
+              case None =>
+                val f = forkRepository(targetAccount, repository, loginAccount.userName)
+                Await.result(f, Duration.Inf)
+                val fork = Database() withTransaction { implicit session =>
+                  getRepository(targetAccount, repositoryName)(session).get
+                }
+                Accepted(JsonFormat(ApiRepository(fork, ApiUser(getAccountByUserName(targetAccount).get))))
             }
           }
         }
