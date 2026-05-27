@@ -8,7 +8,7 @@ import gitbucket.core.util.{FileUtil, HttpClientUtil}
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.methods.{HttpGet, HttpPost}
 import org.apache.http.entity.StringEntity
-import org.apache.http.impl.client.{BasicCookieStore, HttpClients}
+import org.apache.http.impl.client.{BasicCookieStore, CloseableHttpClient, HttpClients}
 import org.apache.http.message.BasicNameValuePair
 import org.apache.http.util.EntityUtils
 import org.eclipse.jetty.server.handler.StatisticsHandler
@@ -108,28 +108,9 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
 
   /** Fork a repository as the given user via the web UI form endpoint. */
   def forkRepository(owner: String, repository: String, asLogin: String, asPassword: String): Unit = {
-    Using.resource(HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build()) { httpClient =>
-      val signin = new HttpPost(s"http://localhost:$port/signin")
-      signin.setEntity(
-        new UrlEncodedFormEntity(
-          JArrays.asList(
-            new BasicNameValuePair("userName", asLogin),
-            new BasicNameValuePair("password", asPassword)
-          )
-        )
-      )
-      val signinResponse = httpClient.execute(signin)
-      EntityUtils.consume(signinResponse.getEntity)
-      assert(signinResponse.getStatusLine.getStatusCode < 400, "signin failed")
-
+    withWebSession(asLogin, asPassword) { httpClient =>
       val fork = new HttpPost(s"http://localhost:$port/$owner/$repository/fork")
-      fork.setEntity(
-        new UrlEncodedFormEntity(
-          JArrays.asList(
-            new BasicNameValuePair("account", asLogin)
-          )
-        )
-      )
+      fork.setEntity(new UrlEncodedFormEntity(JArrays.asList(new BasicNameValuePair("account", asLogin))))
       val forkResponse = httpClient.execute(fork)
       EntityUtils.consume(forkResponse.getEntity)
       assert(forkResponse.getStatusLine.getStatusCode == 302, "fork request failed")
@@ -138,28 +119,9 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
 
   /** Rename a repository via the web settings form. */
   def renameRepository(owner: String, oldName: String, newName: String, login: String, password: String): Unit = {
-    Using.resource(HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build()) { httpClient =>
-      val signin = new HttpPost(s"http://localhost:$port/signin")
-      signin.setEntity(
-        new UrlEncodedFormEntity(
-          JArrays.asList(
-            new BasicNameValuePair("userName", login),
-            new BasicNameValuePair("password", password)
-          )
-        )
-      )
-      val signinResponse = httpClient.execute(signin)
-      EntityUtils.consume(signinResponse.getEntity)
-      assert(signinResponse.getStatusLine.getStatusCode < 400, "signin failed")
-
+    withWebSession(login, password) { httpClient =>
       val rename = new HttpPost(s"http://localhost:$port/$owner/$oldName/settings/rename")
-      rename.setEntity(
-        new UrlEncodedFormEntity(
-          JArrays.asList(
-            new BasicNameValuePair("repositoryName", newName)
-          )
-        )
-      )
+      rename.setEntity(new UrlEncodedFormEntity(JArrays.asList(new BasicNameValuePair("repositoryName", newName))))
       val renameResponse = httpClient.execute(rename)
       EntityUtils.consume(renameResponse.getEntity)
       assert(renameResponse.getStatusLine.getStatusCode == 302, "rename request failed")
@@ -168,20 +130,7 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
 
   /** Delete a repository via the web settings form. */
   def deleteRepository(owner: String, name: String, login: String, password: String): Unit = {
-    Using.resource(HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build()) { httpClient =>
-      val signin = new HttpPost(s"http://localhost:$port/signin")
-      signin.setEntity(
-        new UrlEncodedFormEntity(
-          JArrays.asList(
-            new BasicNameValuePair("userName", login),
-            new BasicNameValuePair("password", password)
-          )
-        )
-      )
-      val signinResponse = httpClient.execute(signin)
-      EntityUtils.consume(signinResponse.getEntity)
-      assert(signinResponse.getStatusLine.getStatusCode < 400, "signin failed")
-
+    withWebSession(login, password) { httpClient =>
       val delete = new HttpPost(s"http://localhost:$port/$owner/$name/settings/delete")
       delete.setEntity(new UrlEncodedFormEntity(JArrays.asList()))
       val deleteResponse = httpClient.execute(delete)
@@ -220,6 +169,24 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
       catch { case _: java.io.IOException => Thread.sleep(500) }
     }
     throw new AssertionError(s"Repository $fullName did not appear within ${timeoutMillis}ms")
+  }
+
+  private def withWebSession[T](login: String, password: String)(f: CloseableHttpClient => T): T = {
+    Using.resource(HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build()) { httpClient =>
+      val signin = new HttpPost(s"http://localhost:$port/signin")
+      signin.setEntity(
+        new UrlEncodedFormEntity(
+          JArrays.asList(
+            new BasicNameValuePair("userName", login),
+            new BasicNameValuePair("password", password)
+          )
+        )
+      )
+      val signinResponse = httpClient.execute(signin)
+      EntityUtils.consume(signinResponse.getEntity)
+      assert(signinResponse.getStatusLine.getStatusCode < 400, "signin failed")
+      f(httpClient)
+    }
   }
 
   private def addStatisticsHandler(handler: Handler) = { // The graceful shutdown is implemented via the statistics handler.
