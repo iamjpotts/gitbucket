@@ -55,7 +55,7 @@ trait RepositoryComponent extends TemplateComponent { self: Profile =>
         ),
         repositoryId
       ).shaped.<>(
-        { case (repository, options, repositoryIdVal) =>
+        { case (repository, options, repositoryId) =>
           Repository(
             repository._1,
             repository._2,
@@ -70,7 +70,7 @@ trait RepositoryComponent extends TemplateComponent { self: Profile =>
             repository._11,
             repository._12,
             RepositoryOptions.apply.tupled.apply(options),
-            repositoryIdVal
+            repositoryId
           )
         },
         { (r: Repository) =>
