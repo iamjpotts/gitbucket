@@ -236,8 +236,7 @@ trait ApiRepositoryControllerBase extends ControllerBase {
               case None if !canCreateRepository(targetAccount, loginAccount) =>
                 Forbidden()
               case None =>
-                val f = forkRepository(targetAccount, repository, loginAccount.userName)
-                Await.result(f, Duration.Inf)
+                Await.result(forkRepository(targetAccount, repository, loginAccount.userName), Duration.Inf)
                 val fork = Database() withTransaction { implicit session =>
                   getRepository(targetAccount, repositoryName)(session).get
                 }
