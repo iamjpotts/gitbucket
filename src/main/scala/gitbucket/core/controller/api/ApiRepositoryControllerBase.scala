@@ -8,7 +8,7 @@ import gitbucket.core.util._
 import gitbucket.core.util.Implicits._
 import gitbucket.core.model.Profile.profile.blockingApi._
 import org.eclipse.jgit.api.Git
-import org.scalatra.{Accepted, Forbidden}
+import org.scalatra.{Accepted, Forbidden, UnprocessableEntity}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
@@ -228,11 +228,11 @@ trait ApiRepositoryControllerBase extends ControllerBase {
           val targetAccount = organization.getOrElse(loginAccount.userName)
 
           if (organization.isDefined && getAccountByUserName(targetAccount).isEmpty) {
-            NotFound()
+            UnprocessableEntity()
           } else {
             getRepository(targetAccount, repositoryName) match {
               case Some(existingFork) =>
-                JsonFormat(ApiRepository(existingFork, ApiUser(getAccountByUserName(targetAccount).get)))
+                Accepted(JsonFormat(ApiRepository(existingFork, ApiUser(getAccountByUserName(targetAccount).get))))
               case None if !canCreateRepository(targetAccount, loginAccount) =>
                 Forbidden()
               case None =>

@@ -308,7 +308,7 @@ class ApiIntegrationTest extends AnyFunSuite {
     }
   }
 
-  test("POST /repos/:owner/:repo/forks with non-existent organization returns 404") {
+  test("POST /repos/:owner/:repo/forks with non-existent organization returns 422") {
     Using.resource(new TestingGitBucketServer(19999)) { server =>
       server.createUser("user4", "user4pass", "user4@example.com", "root", "root")
       val github = server.client("root", "root")
@@ -316,7 +316,23 @@ class ApiIntegrationTest extends AnyFunSuite {
 
       val status =
         server.forkRepositoryViaApi("root", "fork_bad_org_test", Some("does_not_exist"), "user4", "user4pass")
-      assert(status == 404, s"Expected 404 for non-existent organization but got $status")
+      assert(status == 422, s"Expected 422 for non-existent organization but got $status")
+    }
+  }
+
+  test("POST /repos/:owner/:repo/forks for an already-forked repository returns 202") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      server.createUser("user5b", "user5bpass", "user5b@example.com", "root", "root")
+      github.createRepository("double_fork_test").autoInit(true).create()
+
+      val status1 = server.forkRepositoryViaApi("root", "double_fork_test", None, "user5b", "user5bpass")
+      assert(status1 == 202, s"Expected 202 for new fork but got $status1")
+
+      server.waitForRepository(server.client("user5b", "user5bpass"), "user5b/double_fork_test")
+
+      val status2 = server.forkRepositoryViaApi("root", "double_fork_test", None, "user5b", "user5bpass")
+      assert(status2 == 202, s"Expected 202 for existing fork but got $status2")
     }
   }
 
