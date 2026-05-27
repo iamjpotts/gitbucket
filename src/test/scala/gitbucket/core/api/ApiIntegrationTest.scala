@@ -6,7 +6,7 @@ import org.eclipse.jgit.api.Git
 import org.scalatest.funsuite.AnyFunSuite
 
 import scala.util.Using
-import org.kohsuke.github.GHCommitState
+import org.kohsuke.github.{GHCommitState, GHFileNotFoundException}
 
 import java.io.File
 import java.util.logging.{Level, Logger}
@@ -294,6 +294,39 @@ class ApiIntegrationTest extends AnyFunSuite {
     }
   }
 
+  test("GET /repositories/:id with unknown ID returns 404") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      assertThrows[GHFileNotFoundException] {
+        github.getRepositoryById(999999999L)
+      }
+    }
+  }
+
+  test("GET /repositories/:id for a private repository without authentication returns 404") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      val repo = github.createRepository("private_id_test").private_(true).autoInit(true).create()
+      val id = repo.getId
+
+      val status = server.getAnonymousApiStatus(s"/api/v3/repositories/$id")
+      assert(status == 404, s"Expected 404 for unauthenticated access to private repo but got $status")
+    }
+  }
+
+  test("GET /repositories/:id after repository rename resolves by original ID") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      val repo = github.createRepository("pre-rename-id-test").autoInit(true).create()
+      val id = repo.getId
+
+      server.renameRepository("root", "pre-rename-id-test", "post-rename-id-test", "root", "root")
+
+      val found = github.getRepositoryById(id)
+      assert(found.getFullName == "root/post-rename-id-test")
+    }
+  }
+
   test("POST /repos/:owner/:repo/forks creates a fork via REST API") {
     Using.resource(new TestingGitBucketServer(19999)) { server =>
       val github = server.client("root", "root")
@@ -333,6 +366,31 @@ class ApiIntegrationTest extends AnyFunSuite {
 
       val status2 = server.forkRepositoryViaApi("root", "double_fork_test", None, "user5b", "user5bpass")
       assert(status2 == 202, s"Expected 202 for existing fork but got $status2")
+    }
+  }
+
+  test("POST /repos/:owner/:repo/forks with fork disabled returns 403") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      github.createRepository("no-fork-test").autoInit(true).create()
+      server.disableFork("root", "no-fork-test", "root", "root")
+
+      server.createUser("forkuser", "forkuserpass", "forkuser@example.com", "root", "root")
+      val status = server.forkRepositoryViaApi("root", "no-fork-test", None, "forkuser", "forkuserpass")
+      assert(status == 403, s"Expected 403 when forking is disabled but got $status")
+    }
+  }
+
+  test("POST /repos/:owner/:repo/forks into an organization the user is not a member of returns 403") {
+    Using.resource(new TestingGitBucketServer(19999)) { server =>
+      val github = server.client("root", "root")
+      github.createRepository("fork-org-perm-test").autoInit(true).create()
+      server.createOrganization("fork-target-org", "root", "root")
+      server.createUser("nonmember", "nonmemberpass", "nonmember@example.com", "root", "root")
+
+      val status =
+        server.forkRepositoryViaApi("root", "fork-org-perm-test", Some("fork-target-org"), "nonmember", "nonmemberpass")
+      assert(status == 403, s"Expected 403 for non-member forking into org but got $status")
     }
   }
 
@@ -386,25 +444,30 @@ class ApiIntegrationTest extends AnyFunSuite {
     Using.resource(new TestingGitBucketServer(19999)) { server =>
       val github = server.client("root", "root")
       server.createUser("user5", "user5pass", "user5@example.com", "root", "root")
+      server.createUser("user7", "user7pass", "user7@example.com", "root", "root")
 
       github.createRepository("cascade-origin").autoInit(true).create()
+
       server.forkRepository("root", "cascade-origin", "user5", "user5pass")
       server.waitForRepository(server.client("user5", "user5pass"), "user5/cascade-origin")
 
+      // Also fork user5's fork to create a two-level chain: root → user5 → user7
+      server.forkRepository("user5", "cascade-origin", "user7", "user7pass")
+      server.waitForRepository(server.client("user7", "user7pass"), "user7/cascade-origin")
+
       server.renameRepository("root", "cascade-origin", "cascade-renamed", "root", "root")
 
-      // The origin is accessible under the new name
       val renamed = github.getRepository("root/cascade-renamed")
       assert(renamed.getFullName == "root/cascade-renamed")
 
-      // The fork is still accessible under its original name
-      val fork = server.client("user5", "user5pass").getRepository("user5/cascade-origin")
-      assert(fork.getFullName == "user5/cascade-origin")
+      // Both direct and indirect forks still record cascade-renamed as their origin
+      assert(renamed.getForksCount() == 2)
 
-      // forks_count on the renamed origin is 1 only if the fork's ORIGIN_REPOSITORY_NAME
-      // was updated to "cascade-renamed" by ON UPDATE CASCADE; stale pointers would cause
-      // getForkedCount("root", "cascade-renamed") to return 0
-      assert(renamed.getForksCount() == 1)
+      // Renaming the intermediate fork must not break the sub-fork
+      server.renameRepository("user5", "cascade-origin", "cascade-fork-renamed", "user5", "user5pass")
+
+      val subFork = server.client("user7", "user7pass").getRepository("user7/cascade-origin")
+      assert(subFork.getFullName == "user7/cascade-origin")
     }
   }
 
@@ -412,17 +475,30 @@ class ApiIntegrationTest extends AnyFunSuite {
     Using.resource(new TestingGitBucketServer(19999)) { server =>
       val github = server.client("root", "root")
       server.createUser("user6", "user6pass", "user6@example.com", "root", "root")
+      server.createUser("user7b", "user7bpass", "user7b@example.com", "root", "root")
 
       github.createRepository("delete-origin").autoInit(true).create()
+
       server.forkRepository("root", "delete-origin", "user6", "user6pass")
       server.waitForRepository(server.client("user6", "user6pass"), "user6/delete-origin")
 
-      // Deleting the origin must not cascade-delete the fork (ON DELETE SET NULL, not CASCADE)
+      // Also fork user6's fork to create a two-level chain: root → user6 → user7b
+      server.forkRepository("user6", "delete-origin", "user7b", "user7bpass")
+      server.waitForRepository(server.client("user7b", "user7bpass"), "user7b/delete-origin")
+
+      // Deleting the root must not delete the direct fork
       server.deleteRepository("root", "delete-origin", "root", "root")
 
       val fork = server.client("user6", "user6pass").getRepository("user6/delete-origin")
       assert(fork.getFullName == "user6/delete-origin")
       assert(fork.getId != 0)
+
+      // Deleting the intermediate fork must not delete the sub-fork
+      server.deleteRepository("user6", "delete-origin", "user6", "user6pass")
+
+      val subFork = server.client("user7b", "user7bpass").getRepository("user7b/delete-origin")
+      assert(subFork.getFullName == "user7b/delete-origin")
+      assert(subFork.getId != 0)
     }
   }
 

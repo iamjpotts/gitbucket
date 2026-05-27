@@ -171,6 +171,37 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
     throw new AssertionError(s"Repository $fullName did not appear within ${timeoutMillis}ms")
   }
 
+  /** Make an unauthenticated GET request and return the HTTP status code. */
+  def getAnonymousApiStatus(path: String): Int = {
+    HttpClientUtil.withHttpClient(None) { httpClient =>
+      val response = httpClient.execute(new HttpGet(s"http://localhost:$port$path"))
+      EntityUtils.consume(response.getEntity)
+      response.getStatusLine.getStatusCode
+    }
+  }
+
+  /** Disable forking on a repository via the web settings options form. */
+  def disableFork(owner: String, name: String, login: String, password: String): Unit = {
+    withWebSession(login, password) { httpClient =>
+      val post = new HttpPost(s"http://localhost:$port/$owner/$name/settings/options")
+      post.setEntity(
+        new UrlEncodedFormEntity(
+          JArrays.asList(
+            new BasicNameValuePair("issuesOption", "PUBLIC"),
+            new BasicNameValuePair("wikiOption", "PUBLIC"),
+            new BasicNameValuePair("mergeOptions", "merge-commit"),
+            new BasicNameValuePair("defaultMergeOption", "merge-commit"),
+            new BasicNameValuePair("safeMode", "true")
+            // allowFork absent → Scalatra boolean() binding treats absence as false
+          )
+        )
+      )
+      val response = httpClient.execute(post)
+      EntityUtils.consume(response.getEntity)
+      assert(response.getStatusLine.getStatusCode == 302, "disableFork settings update failed")
+    }
+  }
+
   private def withWebSession[T](login: String, password: String)(f: CloseableHttpClient => T): T = {
     Using.resource(HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build()) { httpClient =>
       val signin = new HttpPost(s"http://localhost:$port/signin")
