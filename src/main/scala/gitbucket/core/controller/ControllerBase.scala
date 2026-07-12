@@ -486,7 +486,8 @@ trait AccountManagementControllerBase extends ControllerBase {
     "activities.atom",
     "sidebar-collapse",
     "groups",
-    "new"
+    "new",
+    "login"
   )
 
   protected def reservedNames: Constraint = new Constraint() {

@@ -31,7 +31,7 @@ class GhCliLoginTest extends AnyFunSuite {
   private val AuthorizeUrlPattern = Pattern.compile("Open this URL to continue in your web browser: (\\S+)")
 
   test("gh auth login completes an OAuth web flow against GitBucket") {
-    Using.resource(new TestingGitBucketServer(19999, enableHttps = true)) { server =>
+    Using.resource(new TestingGitBucketServer(19998, enableHttps = true)) { server =>
       server.withWebSession("root", "root") { sessionClient =>
         val ghConfigDir = Files.createTempDirectory("gh-config-").toFile
         val hostAndPort = s"localhost:${server.httpsPort}"
