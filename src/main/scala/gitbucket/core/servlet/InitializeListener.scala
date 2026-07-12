@@ -16,12 +16,36 @@ import gitbucket.core.servlet.Database
 import io.github.gitbucket.solidbase.Solidbase
 import io.github.gitbucket.solidbase.manager.JDBCVersionManager
 import javax.servlet.{ServletContextEvent, ServletContextListener}
+import java.sql.Connection
 
 import org.apache.commons.io.{FileUtils, IOUtils}
 import org.slf4j.LoggerFactory
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
+
+object InitializeListener {
+
+  /**
+   * "login" is reserved (see ControllerBase.allReservedNames) so the /login/oauth/... OAuth
+   * provider routes don't collide with an account's repository URLs. That only stops *new*
+   * accounts from taking the name; an existing installation may already have one. Refuse to
+   * proceed with migration in that case rather than silently creating a URL collision.
+   *
+   * Safe to call before any migration has run: on a brand-new database ACCOUNT doesn't exist
+   * yet, so this is skipped entirely.
+   */
+  private[core] def checkNoAccountNamedLogin(conn: Connection): Unit = {
+    if (conn.allTableNames().contains("ACCOUNT")) {
+      conn.find("SELECT USER_NAME FROM ACCOUNT WHERE USER_NAME = ?", "login")(_ => ()).foreach { _ =>
+        throw new IllegalStateException(
+          "An account with user name 'login' exists. This account must be renamed before the GitBucket upgrade can proceed."
+        )
+      }
+    }
+  }
+
+}
 
 /**
  * Initialize GitBucket system.
@@ -60,6 +84,10 @@ class InitializeListener extends ServletContextListener with SystemSettingsServi
       Database() withTransaction { session =>
         val conn = session.conn
         val manager = new JDBCVersionManager(conn)
+
+        // Refuse to proceed if an existing installation already has an account named
+        // 'login', which the new OAuth provider routes would collide with.
+        InitializeListener.checkNoAccountNamedLogin(conn)
 
         // Check version
         checkVersion(manager, conn)
