@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<changeSet>
+  <!--================================================================================================-->
+  <!-- OAUTH_AUTHORIZATION_CODE                                                                        -->
+  <!--================================================================================================-->
+  <createTable tableName="OAUTH_AUTHORIZATION_CODE">
+    <column name="CODE_HASH" type="varchar(40)" nullable="false" primaryKeyName="IDX_OAUTH_AUTHORIZATION_CODE_PK" primaryKey="true"/>
+    <column name="CLIENT_ID" type="varchar(100)" nullable="false"/>
+    <column name="USER_NAME" type="varchar(100)" nullable="false"/>
+    <column name="SCOPES" type="varchar(200)" nullable="false"/>
+    <column name="REDIRECT_URI" type="varchar(500)" nullable="false"/>
+    <column name="EXPIRES_AT" type="datetime" nullable="false"/>
+  </createTable>
+
+  <addForeignKeyConstraint constraintName="IDX_OAUTH_AUTHORIZATION_CODE_FK0" baseTableName="OAUTH_AUTHORIZATION_CODE" baseColumnNames="USER_NAME" referencedTableName="ACCOUNT" referencedColumnNames="USER_NAME" onDelete="CASCADE" onUpdate="CASCADE"/>
+
+  <!--================================================================================================-->
+  <!-- OAUTH_ACCESS_TOKEN                                                                              -->
+  <!--================================================================================================-->
+  <createTable tableName="OAUTH_ACCESS_TOKEN">
+    <column name="TOKEN_ID" type="int" nullable="false" autoIncrement="true" unique="true" primaryKeyName="IDX_OAUTH_ACCESS_TOKEN_PK" primaryKey="true"/>
+    <column name="TOKEN_HASH" type="varchar(40)" nullable="false"/>
+    <column name="CLIENT_ID" type="varchar(100)" nullable="false"/>
+    <column name="USER_NAME" type="varchar(100)" nullable="false"/>
+    <column name="SCOPES" type="varchar(200)" nullable="false"/>
+    <column name="CREATED_AT" type="datetime" nullable="false"/>
+  </createTable>
+
+  <addUniqueConstraint constraintName="IDX_OAUTH_ACCESS_TOKEN_TOKEN_HASH" tableName="OAUTH_ACCESS_TOKEN" columnNames="TOKEN_HASH"/>
+  <addForeignKeyConstraint constraintName="IDX_OAUTH_ACCESS_TOKEN_FK0" baseTableName="OAUTH_ACCESS_TOKEN" baseColumnNames="USER_NAME" referencedTableName="ACCOUNT" referencedColumnNames="USER_NAME" onDelete="CASCADE" onUpdate="CASCADE"/>
+</changeSet>

@@ -80,5 +80,7 @@ trait CoreProfile
     with CustomFieldComponent
     with IssueCustomFieldComponent
     with IssueAssigneeComponent
+    with OAuthAuthorizationCodeComponent
+    with OAuthAccessTokenComponent
 
 object Profile extends CoreProfile
