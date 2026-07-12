@@ -1,13 +1,13 @@
 package gitbucket.core.util
 
-import java.net.InetAddress
+import java.net.{InetAddress, URI}
 
 import gitbucket.core.service.SystemSettingsService
 import org.apache.commons.net.util.SubnetUtils
 import org.apache.http.HttpHost
 import org.apache.http.auth.{AuthScope, UsernamePasswordCredentials}
 import org.apache.http.impl.client.{BasicCredentialsProvider, CloseableHttpClient, HttpClientBuilder}
-import scala.util.Using
+import scala.util.{Try, Using}
 
 object HttpClientUtil {
 
@@ -44,5 +44,22 @@ object HttpClientUtil {
       ipRange == ipAddress
     }
   }
+
+  /**
+   * RFC 8252 §7.3: native-app OAuth clients (like the well-known gh CLI client) can't
+   * pre-register a fixed redirect URI, since they listen on a loopback port chosen at
+   * runtime. Exact-match redirect validation is relaxed to any port on `127.0.0.1`,
+   * `localhost`, or an IPv6 loopback address, over plain `http`.
+   */
+  def isLoopbackRedirectUri(uri: String): Boolean =
+    Try(new URI(uri)).toOption.exists { parsed =>
+      val host = parsed.getHost
+      parsed.getScheme == "http" && host != null &&
+      (host == "127.0.0.1" || host == "localhost" || isIPv6Loopback(host))
+    }
+
+  private def isIPv6Loopback(host: String): Boolean =
+    host.startsWith("[") && host.endsWith("]") &&
+      Try(InetAddress.getByName(host.substring(1, host.length - 1)).isLoopbackAddress).getOrElse(false)
 
 }
