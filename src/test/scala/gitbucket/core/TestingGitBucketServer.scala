@@ -7,24 +7,50 @@ import java.io.File
 import gitbucket.core.util.{FileUtil, HttpClientUtil}
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.methods.{HttpGet, HttpPatch, HttpPost, HttpPut}
+import org.apache.http.conn.ssl.{NoopHostnameVerifier, SSLConnectionSocketFactory, TrustAllStrategy}
 import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.{BasicCookieStore, CloseableHttpClient, HttpClients}
 import org.apache.http.message.BasicNameValuePair
+import org.apache.http.ssl.SSLContexts
 import org.apache.http.util.EntityUtils
 import org.eclipse.jetty.server.handler.StatisticsHandler
-import org.eclipse.jetty.server.{Handler, Server}
+import org.eclipse.jetty.server.{
+  Handler,
+  HttpConfiguration,
+  HttpConnectionFactory,
+  Server,
+  ServerConnector,
+  SslConnectionFactory
+}
+import org.eclipse.jetty.util.ssl.SslContextFactory
 import org.eclipse.jetty.webapp.WebAppContext
 import org.kohsuke.github.{GHRepository, GitHub, GitHubBuilder}
 
 import java.util.{Arrays => JArrays}
 import java.util.Base64
+import scala.sys.process.Process
 import scala.util.Using
 
-class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
+/**
+ * @param enableHttps when true, an additional HTTPS connector is bound to an ephemeral port
+ *  (see [[httpsPort]]) using a throwaway self-signed certificate. `gh` (and other GitHub
+ *  clients) refuse plain HTTP for any non-github.com host, so tests that drive the real
+ *  `gh` binary need this; tests that only talk HTTP-to-HTTP (via `GitHubBuilder`, the
+ *  `getApi`/`gh_call`-style helpers below, or the `org.apache.http` clients) don't.
+ */
+class TestingGitBucketServer(val port: Int = 19999, enableHttps: Boolean = false) extends AutoCloseable {
   case class ApiResponse(status: Int, body: String)
 
   private var server: Server = null
   private var dir: File = null
+  private var httpsConnector: ServerConnector = null
+
+  /** Bound only when `enableHttps` is true. */
+  var httpsPort: Int = -1
+
+  /** PEM-encoded CA certificate for the self-signed cert above; set `SSL_CERT_FILE` to this
+   *  path so a Go-based client (e.g. `gh`) trusts it. Bound only when `enableHttps` is true. */
+  var caCertPath: File = null
 
   start()
 
@@ -46,7 +72,15 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
     val handler = addStatisticsHandler(context)
     server.setHandler(handler)
 
+    if (enableHttps) {
+      addHttpsConnector()
+    }
+
     server.start()
+
+    if (enableHttps) {
+      httpsPort = httpsConnector.getLocalPort
+    }
 
     HttpClientUtil.withHttpClient(None) { httpClient =>
       var launched = false
@@ -59,6 +93,78 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
         count += 1
       }
     }
+  }
+
+  /** Generates a throwaway self-signed keystore via the JDK's `keytool` (already a build
+   *  prerequisite, so no new external tool dependency), then binds a second Jetty connector
+   *  for TLS on an ephemeral port using it. */
+  private def addHttpsConnector(): Unit = {
+    val keystoreFile = new File(dir, "keystore.p12")
+    val keystorePassword = "changeit"
+
+    val genKeyPair = Process(
+      Seq(
+        "keytool",
+        "-genkeypair",
+        "-alias",
+        "jetty",
+        "-keyalg",
+        "RSA",
+        "-keysize",
+        "2048",
+        "-validity",
+        "1",
+        "-keystore",
+        keystoreFile.getAbsolutePath,
+        "-storetype",
+        "PKCS12",
+        "-storepass",
+        keystorePassword,
+        "-keypass",
+        keystorePassword,
+        "-dname",
+        "CN=localhost",
+        "-ext",
+        "SAN=dns:localhost,ip:127.0.0.1"
+      )
+    ).!
+    assert(genKeyPair == 0, "keytool -genkeypair failed")
+
+    caCertPath = new File(dir, "cert.pem")
+    val exportCert = Process(
+      Seq(
+        "keytool",
+        "-exportcert",
+        "-alias",
+        "jetty",
+        "-keystore",
+        keystoreFile.getAbsolutePath,
+        "-storetype",
+        "PKCS12",
+        "-storepass",
+        keystorePassword,
+        "-rfc",
+        "-file",
+        caCertPath.getAbsolutePath
+      )
+    ).!
+    assert(exportCert == 0, "keytool -exportcert failed")
+
+    val sslContextFactory = new SslContextFactory.Server()
+    sslContextFactory.setKeyStorePath(keystoreFile.getAbsolutePath)
+    sslContextFactory.setKeyStorePassword(keystorePassword)
+    sslContextFactory.setKeyManagerPassword(keystorePassword)
+
+    val httpConfig = new HttpConfiguration()
+    httpConfig.setSecureScheme("https")
+
+    httpsConnector = new ServerConnector(
+      server,
+      new SslConnectionFactory(sslContextFactory, org.eclipse.jetty.http.HttpVersion.HTTP_1_1.asString()),
+      new HttpConnectionFactory(httpConfig)
+    )
+    httpsConnector.setPort(0) // ephemeral port
+    server.addConnector(httpsConnector)
   }
 
   def client(login: String, password: String): GitHub =
@@ -272,8 +378,25 @@ class TestingGitBucketServer(val port: Int = 19999) extends AutoCloseable {
     }
   }
 
-  private def withWebSession[T](login: String, password: String)(f: CloseableHttpClient => T): T = {
-    Using.resource(HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build()) { httpClient =>
+  /** Sign in as the given user with a cookie-jar-backed HTTP client, then run `f` with it.
+   *  `private[core]` (rather than `private`) so other test files in this package (e.g. tests
+   *  driving an external OAuth-consuming client that needs a session-authenticated browser
+   *  stand-in) can reuse the same session for follow-up requests. The client trusts any TLS
+   *  certificate (test-only self-signed certs, when `enableHttps` is used) — cookies aren't
+   *  port-scoped, so the same session cookie set over plain HTTP is sent on HTTPS requests to
+   *  the same host too. */
+  private[core] def withWebSession[T](login: String, password: String)(f: CloseableHttpClient => T): T = {
+    val trustAllSslSocketFactory = new SSLConnectionSocketFactory(
+      SSLContexts.custom().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build(),
+      NoopHostnameVerifier.INSTANCE
+    )
+    Using.resource(
+      HttpClients
+        .custom()
+        .setDefaultCookieStore(new BasicCookieStore())
+        .setSSLSocketFactory(trustAllSslSocketFactory)
+        .build()
+    ) { httpClient =>
       val signin = new HttpPost(s"http://localhost:$port/signin")
       signin.setEntity(
         new UrlEncodedFormEntity(
