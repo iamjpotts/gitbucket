@@ -472,21 +472,24 @@ class GitBucketCoreModuleSpec extends AnyFunSuite {
     insertRow(conn, "RELEASE_ASSET", Map("SIZE" -> 12345L))
   }
 
-  private def assertRepositoryDataPreservedBy447Migrations(conn: Connection, db: Database): Unit = {
+  private def assertDataPreservedBySchemaMigrations(conn: Connection, db: Database): Unit = {
     migrate(conn, db, moduleBeforeOrphanRepair)
     insertSchemaPreservationData(conn)
 
     val beforeSnapshots =
       schemaPreservationSnapshotTables.map(tableName => tableName -> snapshotTable(conn, tableName)).toMap
     val repositoryColumnsBeforeMigration = beforeSnapshots("REPOSITORY").columns
+    val accountColumnsBeforeMigration = beforeSnapshots("ACCOUNT").columns
 
     migrate(conn, db, fullModule)
 
     schemaPreservationSnapshotTables.foreach { tableName =>
       val expected = beforeSnapshots(tableName)
-      val actual =
-        if (tableName == "REPOSITORY") snapshotTable(conn, tableName, repositoryColumnsBeforeMigration)
-        else snapshotTable(conn, tableName)
+      val actual = tableName match {
+        case "REPOSITORY" => snapshotTable(conn, tableName, repositoryColumnsBeforeMigration)
+        case "ACCOUNT"    => snapshotTable(conn, tableName, accountColumnsBeforeMigration)
+        case _            => snapshotTable(conn, tableName)
+      }
 
       assert(actual.columns == expected.columns, s"${tableName} columns changed unexpectedly")
       assert(actual.rows == expected.rows, s"${tableName} rows changed unexpectedly")
@@ -497,6 +500,12 @@ class GitBucketCoreModuleSpec extends AnyFunSuite {
     val repositoryIds = repositoryIdSnapshot.rows.map(_.last)
     assert(repositoryIds.forall(id => id.nonEmpty && id != "<NULL>" && id != "0"))
     assert(repositoryIds.distinct.size == repositoryIds.size)
+
+    val accountIdSnapshot =
+      snapshotTable(conn, "ACCOUNT", Seq("USER_NAME", "ACCOUNT_ID"))
+    val accountIds = accountIdSnapshot.rows.map(_.last)
+    assert(accountIds.forall(id => id.nonEmpty && id != "<NULL>" && id != "0"))
+    assert(accountIds.distinct.size == accountIds.size)
   }
 
   private def accountRows(conn: Connection): Seq[AccountRow] =
@@ -626,10 +635,10 @@ class GitBucketCoreModuleSpec extends AnyFunSuite {
     }
   }
 
-  test("Migration H2 ensure repository data is preserved after 4.47 schema changes") {
+  test("Migration H2 ensure data is preserved after 4.47 and 4.48 schema changes") {
     Using.resource(DriverManager.getConnection("jdbc:h2:mem:test-schema-preservation;DB_CLOSE_DELAY=-1", "sa", "sa")) {
       conn =>
-        assertRepositoryDataPreservedBy447Migrations(conn, new H2Database())
+        assertDataPreservedBySchemaMigrations(conn, new H2Database())
     }
   }
 
@@ -680,7 +689,7 @@ class GitBucketCoreModuleSpec extends AnyFunSuite {
       }
     }
 
-    test(s"Migration MySQL $tag ensure repository data is preserved after 4.47 schema changes", ExternalDBTest) {
+    test(s"Migration MySQL $tag ensure data is preserved after 4.47 and 4.48 schema changes", ExternalDBTest) {
       val container = new MySQLContainer(s"mysql:$tag") {
         override def getDriverClassName = "org.mariadb.jdbc.Driver"
         override def getJdbcUrl: String = super.getJdbcUrl + "?permitMysqlScheme"
@@ -690,7 +699,7 @@ class GitBucketCoreModuleSpec extends AnyFunSuite {
         Using.resource(
           DriverManager.getConnection(container.getJdbcUrl, container.getUsername, container.getPassword)
         ) { conn =>
-          assertRepositoryDataPreservedBy447Migrations(conn, new MySQLDatabase())
+          assertDataPreservedBySchemaMigrations(conn, new MySQLDatabase())
         }
       } finally {
         container.stop()
@@ -736,7 +745,7 @@ class GitBucketCoreModuleSpec extends AnyFunSuite {
     }
 
     test(
-      s"Migration PostgreSQL $tag ensure repository data is preserved after 4.47 schema changes",
+      s"Migration PostgreSQL $tag ensure data is preserved after 4.47 and 4.48 schema changes",
       ExternalDBTest
     ) {
       val container = new PostgreSQLContainer(DockerImageName.parse(s"postgres:$tag"))
@@ -746,7 +755,7 @@ class GitBucketCoreModuleSpec extends AnyFunSuite {
         Using.resource(
           DriverManager.getConnection(container.getJdbcUrl, container.getUsername, container.getPassword)
         ) { conn =>
-          assertRepositoryDataPreservedBy447Migrations(conn, new PostgresDatabase())
+          assertDataPreservedBySchemaMigrations(conn, new PostgresDatabase())
         }
       } finally {
         container.stop()
