@@ -18,8 +18,10 @@ import scala.util.Using
 /**
  * Drives the real `gh` CLI through `gh auth login` against a real, running GitBucket
  * instance over real HTTPS (gh categorically refuses plain HTTP for any non-github.com
- * host). GitBucket currently has no `/login/oauth` OAuth-provider routes, so this test
- * fails today at the consent-screen step (HTTP 404).
+ * host). `gh` completes the OAuth handshake and obtains a token, but then fails on its
+ * post-login `GET /user` call with 401 — `ApiAuthenticationFilter` doesn't yet resolve
+ * OAuth-issued tokens, and there is no `/api/graphql` `viewer{login}` stub yet, which
+ * `gh`'s login flow itself also depends on.
  *
  * Needs `gh` (verified against 2.86.0) and `keytool` (bundled with the JDK) on `PATH`, and
  * `sbt package` to have run first, same as `ApiIntegrationTest`.
@@ -62,9 +64,13 @@ class GhCliLoginTest extends AnyFunSuite {
 
         // Drain any further gh output on a background thread so it never blocks on a full pipe
         // while we're doing the consent round-trip below.
+        val remainingOutput = new StringBuilder
         val drainThread = new Thread(() => {
           try {
-            while (reader.readLine() != null) {}
+            var l: String = null
+            while ({ l = reader.readLine(); l != null }) {
+              remainingOutput.append(l).append('\n')
+            }
           } catch { case _: Exception => () }
         })
         drainThread.setDaemon(true)
@@ -109,9 +115,17 @@ class GhCliLoginTest extends AnyFunSuite {
           s"consent approval did not redirect: HTTP ${approveResponse.getStatusLine.getStatusCode}"
         )
 
+        // Follow the redirect to deliver the code to gh's own loopback callback server,
+        // letting `gh auth login` proceed.
+        val callbackUrl = approveResponse.getFirstHeader("Location").getValue
+        Using.resource(org.apache.http.impl.client.HttpClients.custom().build()) { plainClient =>
+          val callbackResponse = plainClient.execute(new HttpGet(callbackUrl))
+          EntityUtils.consume(callbackResponse.getEntity)
+        }
+
         val exited = loginProcess.waitFor(10, TimeUnit.SECONDS)
         assert(exited, "gh auth login did not exit within 10 seconds")
-        assert(loginProcess.exitValue() == 0, "gh auth login exited with a non-zero status")
+        assert(loginProcess.exitValue() == 0, s"gh auth login exited with a non-zero status: $remainingOutput")
 
         // Verify the login actually took: gh should now be able to make an authenticated API
         // call with the token it just obtained. gh's login flow itself already depends on the

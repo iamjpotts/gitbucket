@@ -35,8 +35,13 @@ trait OAuthService {
   }
 
   /**
-   * Validates the code (must exist, match `clientId` and `redirectUri` exactly, and not be
-   * expired), consumes it (single-use), and issues a new access token.
+   * Validates the code (must exist, match `clientId`, and not be expired), consumes it
+   * (single-use), and issues a new access token.
+   *
+   * `redirectUri`, when non-empty, must match exactly what was passed to
+   * `issueAuthorizationCode`. An empty `redirectUri` skips that check — verified against the
+   * real `gh` binary, `cli/oauth`'s web-app-flow token exchange omits `redirect_uri` entirely,
+   * matching GitHub's own classic OAuth token endpoint, which doesn't require it back either.
    *
    * @return (tokenId, raw access token, granted scopes)
    */
@@ -44,14 +49,13 @@ trait OAuthService {
     s: Session
   ): Option[(Int, String, String)] = {
     val hash = AccessTokenService.tokenToHash(plainCode)
-    OAuthAuthorizationCodes
-      .filter { c =>
-        c.codeHash === hash.bind &&
-        c.clientId === clientId.bind &&
-        c.redirectUri === redirectUri.bind &&
-        c.expiresAt > currentDate.bind
-      }
-      .firstOption
+    val baseFilter = OAuthAuthorizationCodes.filter { c =>
+      c.codeHash === hash.bind &&
+      c.clientId === clientId.bind &&
+      c.expiresAt > currentDate.bind
+    }
+    val filtered = if (redirectUri.isEmpty) baseFilter else baseFilter.filter(_.redirectUri === redirectUri.bind)
+    filtered.firstOption
       .map { code =>
         // Single-use: the code row is deleted before the token is issued.
         OAuthAuthorizationCodes.filter(_.codeHash === hash.bind).delete

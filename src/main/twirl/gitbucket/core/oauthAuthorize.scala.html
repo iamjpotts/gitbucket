@@ -1,0 +1,31 @@
+@(clientId: String, redirectUri: String, state: Option[String], scope: String)(implicit context: gitbucket.core.controller.Context)
+@gitbucket.core.html.main("Authorize Application"){
+  <div class="content-wrapper main-center">
+    <div class="content body">
+      <div class="panel panel-default">
+        <div class="panel-heading strong">Authorize GitHub CLI</div>
+        <div class="panel-body">
+          <p>GitHub CLI wants to access your account on this GitBucket instance.</p>
+          <p>This will grant access to: <code>@scope</code></p>
+
+          <form id="oauth-approve-form" method="post" action="@context.path/login/oauth/authorize" style="display: inline-block;">
+            <input type="hidden" name="client_id" value="@clientId"/>
+            <input type="hidden" name="redirect_uri" value="@redirectUri"/>
+            <input type="hidden" name="state" value="@state.getOrElse("")"/>
+            <input type="hidden" name="scope" value="@scope"/>
+            <input type="hidden" name="approve" value="true"/>
+            <input type="submit" class="btn btn-success" value="Authorize"/>
+          </form>
+          <form id="oauth-deny-form" method="post" action="@context.path/login/oauth/authorize" style="display: inline-block;">
+            <input type="hidden" name="client_id" value="@clientId"/>
+            <input type="hidden" name="redirect_uri" value="@redirectUri"/>
+            <input type="hidden" name="state" value="@state.getOrElse("")"/>
+            <input type="hidden" name="scope" value="@scope"/>
+            <input type="hidden" name="approve" value="false"/>
+            <input type="submit" class="btn btn-danger" value="Cancel"/>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+}

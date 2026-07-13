@@ -57,6 +57,15 @@ class TestingGitBucketServer(val port: Int = 19999, enableHttps: Boolean = false
   private def start(): Unit = {
     System.setProperty("java.awt.headless", "true")
 
+    // gitbucket.core.util.Directory.GitBucketHome is a JVM-singleton val resolved from
+    // System.getProperty("gitbucket.home") on first access, and the whole `sbt test` run
+    // shares one forked JVM. Touching it here, before mutating the property below, guarantees
+    // that whichever suite happens to construct the first TestingGitBucketServer in the JVM
+    // can never race ahead of (and permanently override) the JVM's true launch-time home
+    // directory for every other test that reads Directory.* — including tests, like
+    // DirectorySpec, that never construct a TestingGitBucketServer themselves.
+    val _ = gitbucket.core.util.Directory.GitBucketHome
+
     dir = Files.createTempDirectory("gitbucket-test-").toFile
     System.setProperty("gitbucket.home", dir.getAbsolutePath)
 
