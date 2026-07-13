@@ -18,10 +18,9 @@ import scala.util.Using
 /**
  * Drives the real `gh` CLI through `gh auth login` against a real, running GitBucket
  * instance over real HTTPS (gh categorically refuses plain HTTP for any non-github.com
- * host). `gh` completes the OAuth handshake and obtains a token, but then fails on its
- * post-login `GET /user` call with 401 — `ApiAuthenticationFilter` doesn't yet resolve
- * OAuth-issued tokens, and there is no `/api/graphql` `viewer{login}` stub yet, which
- * `gh`'s login flow itself also depends on.
+ * host). `gh` completes the OAuth handshake and obtains a token, and can now use it to
+ * authenticate REST calls, but its login flow also depends on one GraphQL call
+ * (`viewer { login }`) to learn the username, and there is no `/api/graphql` route yet.
  *
  * Needs `gh` (verified against 2.86.0) and `keytool` (bundled with the JDK) on `PATH`, and
  * `sbt package` to have run first, same as `ApiIntegrationTest`.

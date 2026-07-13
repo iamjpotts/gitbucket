@@ -68,6 +68,30 @@ class OAuthControllerTest extends AnyFunSuite {
     }
   }
 
+  /** Runs the full authorize+consent+exchange flow and returns a fresh, valid OAuth access
+   *  token. */
+  private def obtainToken(server: TestingGitBucketServer): String = {
+    val code = obtainCode(server)
+    HttpClientUtil.withHttpClient(None) { httpClient =>
+      val exchange = new HttpPost(s"http://localhost:${server.port}/login/oauth/access_token")
+      exchange.setHeader("Accept", "application/json")
+      exchange.setEntity(
+        new UrlEncodedFormEntity(
+          JArrays.asList(
+            new BasicNameValuePair("client_id", ClientId),
+            new BasicNameValuePair("code", code),
+            new BasicNameValuePair("redirect_uri", RedirectUri),
+            new BasicNameValuePair("grant_type", "authorization_code")
+          )
+        )
+      )
+      val response = httpClient.execute(exchange)
+      val body = EntityUtils.toString(response.getEntity, "UTF-8")
+      assert(response.getStatusLine.getStatusCode == 200, body)
+      (parse(body) \ "access_token").extract[String]
+    }
+  }
+
   test("GET /login/oauth/authorize with no session redirects to /signin") {
     Using.resource(new TestingGitBucketServer(19996)) { server =>
       Using.resource(
@@ -251,6 +275,47 @@ class OAuthControllerTest extends AnyFunSuite {
         val second = exchange()
         assert(second._1 == 400, second._2)
         assert((parse(second._2) \ "error").extract[String].nonEmpty)
+      }
+    }
+  }
+
+  test("GET /api/v3/user with 'Authorization: token <OAuth token>' resolves the account") {
+    Using.resource(new TestingGitBucketServer(19996)) { server =>
+      val token = obtainToken(server)
+      HttpClientUtil.withHttpClient(None) { httpClient =>
+        val get = new HttpGet(s"http://localhost:${server.port}/api/v3/user")
+        get.setHeader("Authorization", s"token $token")
+        val response = httpClient.execute(get)
+        val body = EntityUtils.toString(response.getEntity, "UTF-8")
+        assert(response.getStatusLine.getStatusCode == 200, body)
+        assert((parse(body) \ "login").extract[String] == "root")
+      }
+    }
+  }
+
+  test("GET /api/v3/user with 'Authorization: bearer <OAuth token>' resolves the account") {
+    Using.resource(new TestingGitBucketServer(19996)) { server =>
+      val token = obtainToken(server)
+      HttpClientUtil.withHttpClient(None) { httpClient =>
+        val get = new HttpGet(s"http://localhost:${server.port}/api/v3/user")
+        get.setHeader("Authorization", s"bearer $token")
+        val response = httpClient.execute(get)
+        val body = EntityUtils.toString(response.getEntity, "UTF-8")
+        assert(response.getStatusLine.getStatusCode == 200, body)
+        assert((parse(body) \ "login").extract[String] == "root")
+      }
+    }
+  }
+
+  test("GET /api/v3/user with an unknown bearer token is rejected with Bad credentials") {
+    Using.resource(new TestingGitBucketServer(19996)) { server =>
+      HttpClientUtil.withHttpClient(None) { httpClient =>
+        val get = new HttpGet(s"http://localhost:${server.port}/api/v3/user")
+        get.setHeader("Authorization", "token not-a-real-token")
+        val response = httpClient.execute(get)
+        val body = EntityUtils.toString(response.getEntity, "UTF-8")
+        assert(response.getStatusLine.getStatusCode == 401, body)
+        assert(body.contains("Bad credentials"))
       }
     }
   }
