@@ -5,7 +5,7 @@ import javax.servlet.http.{HttpServletRequest, HttpServletResponse}
 
 import gitbucket.core.model.Account
 import gitbucket.core.service.SystemSettingsService.SystemSettings
-import gitbucket.core.service.{AccessTokenService, AccountService, SystemSettingsService}
+import gitbucket.core.service.{AccessTokenService, AccountService, OAuthService, SystemSettingsService}
 import gitbucket.core.util.{AuthUtil, Keys}
 import gitbucket.core.model.Profile.profile.blockingApi._
 // Imported names have higher precedence than names, defined in other files.
@@ -26,7 +26,11 @@ class ApiAuthenticationFilter extends Filter with AccessTokenService with Accoun
     Option(request.getHeader("Authorization"))
       .map {
         case auth if auth.toLowerCase().startsWith("token ") || auth.toLowerCase().startsWith("bearer ") =>
-          AccessTokenService.getAccountByAccessToken(auth.substring(auth.indexOf(" ") + 1).trim).toRight(())
+          val token = auth.substring(auth.indexOf(" ") + 1).trim
+          AccessTokenService
+            .getAccountByAccessToken(token)
+            .orElse(OAuthService.validateToken(token))
+            .toRight(())
         case auth if auth.startsWith("Basic ") => doBasicAuth(auth, loadSystemSettings(), request).toRight(())
         case _                                 => Left(())
       }
