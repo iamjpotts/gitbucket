@@ -42,6 +42,7 @@ class ScalatraBootstrap extends LifeCycle with SystemSettingsService {
     val filter = new CompositeScalatraFilter()
     filter.mount(new IndexController, "/")
     filter.mount(new OAuthController, "/*")
+    filter.mount(new GraphqlController, "/api")
     filter.mount(new ApiController, "/api/v3")
     filter.mount(new SystemSettingsController, "/admin")
     filter.mount(new DashboardController, "/*")
