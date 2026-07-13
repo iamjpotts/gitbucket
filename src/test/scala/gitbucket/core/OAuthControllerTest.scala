@@ -8,6 +8,7 @@ import gitbucket.core.util.HttpClientUtil
 import org.apache.http.client.config.RequestConfig
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.methods.{HttpGet, HttpPost}
+import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.message.BasicNameValuePair
 import org.apache.http.util.EntityUtils
@@ -316,6 +317,52 @@ class OAuthControllerTest extends AnyFunSuite {
         val body = EntityUtils.toString(response.getEntity, "UTF-8")
         assert(response.getStatusLine.getStatusCode == 401, body)
         assert(body.contains("Bad credentials"))
+      }
+    }
+  }
+
+  private def graphqlPost(port: Int, query: String, token: Option[String]): HttpPost = {
+    val post = new HttpPost(s"http://localhost:$port/api/graphql")
+    token.foreach(t => post.setHeader("Authorization", s"token $t"))
+    post.setEntity(new StringEntity(s"""{"query":"${query.replace("\"", "\\\"")}"}""", "UTF-8"))
+    post
+  }
+
+  test("POST /api/graphql with no Authorization is rejected with 401") {
+    Using.resource(new TestingGitBucketServer(19996)) { server =>
+      HttpClientUtil.withHttpClient(None) { httpClient =>
+        val response = httpClient.execute(graphqlPost(server.port, "query UserCurrent{viewer{login}}", None))
+        EntityUtils.consume(response.getEntity)
+        assert(response.getStatusLine.getStatusCode == 401)
+      }
+    }
+  }
+
+  test("POST /api/graphql, valid bearer token, a viewer query returns the authenticated login") {
+    Using.resource(new TestingGitBucketServer(19996)) { server =>
+      val token = obtainToken(server)
+      HttpClientUtil.withHttpClient(None) { httpClient =>
+        val response = httpClient.execute(graphqlPost(server.port, "query UserCurrent{viewer{login}}", Some(token)))
+        val body = EntityUtils.toString(response.getEntity, "UTF-8")
+        assert(response.getStatusLine.getStatusCode == 200, body)
+        assert((parse(body) \ "data" \ "viewer" \ "login").extract[String] == "root")
+      }
+    }
+  }
+
+  test("POST /api/graphql, valid bearer token, an unsupported query returns a GraphQL-shaped error") {
+    Using.resource(new TestingGitBucketServer(19996)) { server =>
+      val token = obtainToken(server)
+      HttpClientUtil.withHttpClient(None) { httpClient =>
+        val response =
+          httpClient.execute(graphqlPost(server.port, """query{repository(owner:"x",name:"y"){id}}""", Some(token)))
+        val body = EntityUtils.toString(response.getEntity, "UTF-8")
+        assert(response.getStatusLine.getStatusCode == 200, body)
+        val json = parse(body)
+        assert(json \ "data" == JNull)
+        assert(
+          (json \ "errors" \ "message").extract[List[String]] == List("GitBucket does not yet support this request")
+        )
       }
     }
   }
