@@ -19,9 +19,7 @@ import scala.util.Using
  * Drives the real `gh` CLI through `gh auth login` against a real, running GitBucket
  * instance over real HTTPS (gh categorically refuses plain HTTP for any non-github.com
  * host). GitBucket currently has no `/login/oauth` OAuth-provider routes, so this test
- * fails today at the consent-screen step (HTTP 404) — it establishes the goal for
- * ../../../../../gitbucket-agents/docs/woodpecker-ci/20260712-oauth-woodpecker-gh-plan.md,
- * whose remaining steps make it pass.
+ * fails today at the consent-screen step (HTTP 404).
  *
  * Needs `gh` (verified against 2.86.0) and `keytool` (bundled with the JDK) on `PATH`, and
  * `sbt package` to have run first, same as `ApiIntegrationTest`.
