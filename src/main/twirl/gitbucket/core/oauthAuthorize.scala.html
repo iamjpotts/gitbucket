@@ -6,7 +6,7 @@
         <div class="panel-heading strong">Authorize GitHub CLI</div>
         <div class="panel-body">
           <p>GitHub CLI wants to access your account on this GitBucket instance.</p>
-          <p>This will grant access to: <code>@scope</code></p>
+          <p>The request asks to grant access to <code>@scope</code>. Since GitBucket does not currently enforce scopes, full access will be granted to your account.</p>
 
           <form id="oauth-approve-form" method="post" action="@context.path/login/oauth/authorize" style="display: inline-block;">
             <input type="hidden" name="client_id" value="@clientId"/>

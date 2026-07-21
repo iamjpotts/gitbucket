@@ -4,7 +4,7 @@ import javax.servlet.http.HttpServletRequest
 
 import gitbucket.core.service.OAuthService
 import gitbucket.core.util.Implicits._
-import gitbucket.core.util.StringUtil
+import gitbucket.core.util.{HttpClientUtil, StringUtil}
 import org.json4s._
 import org.json4s.jackson.Serialization.write
 import org.scalatra.BadRequest
@@ -31,7 +31,7 @@ class OAuthController extends ControllerBase with OAuthService {
 
         if (!isKnownClient(clientId)) {
           BadRequest("Unknown client_id")
-        } else if (!isLoopbackRedirectUri(redirectUri)) {
+        } else if (!HttpClientUtil.isLoopbackRedirectUri(redirectUri)) {
           BadRequest("redirect_uri must be a loopback address (127.0.0.1 or localhost) over http")
         } else {
           gitbucket.core.html.oauthAuthorize(clientId, redirectUri, state, scope)
@@ -49,7 +49,7 @@ class OAuthController extends ControllerBase with OAuthService {
         val scope = params.getOrElse("scope", "")
         val approved = params.get("approve").contains("true")
 
-        if (!isKnownClient(clientId) || !isLoopbackRedirectUri(redirectUri)) {
+        if (!isKnownClient(clientId) || !HttpClientUtil.isLoopbackRedirectUri(redirectUri)) {
           BadRequest("Unknown client_id or invalid redirect_uri")
         } else if (approved) {
           val code = issueAuthorizationCode(clientId, account.userName, scope, redirectUri)

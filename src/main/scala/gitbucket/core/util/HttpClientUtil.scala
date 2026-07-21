@@ -62,4 +62,12 @@ object HttpClientUtil {
     host.startsWith("[") && host.endsWith("]") &&
       Try(InetAddress.getByName(host.substring(1, host.length - 1)).isLoopbackAddress).getOrElse(false)
 
+  /**
+   * Used to decide whether to suggest a host as a `gh auth login --hostname` hint: only
+   * hostnames that a `gh` running on a different machine could plausibly resolve and reach,
+   * so `localhost`, bare IPv4 addresses, and IPv6 addresses (which contain `:`) are excluded.
+   */
+  def isPublicHostname(host: String): Boolean =
+    host != "localhost" && !host.matches("""\d{1,3}(\.\d{1,3}){3}""") && !host.contains(":")
+
 }

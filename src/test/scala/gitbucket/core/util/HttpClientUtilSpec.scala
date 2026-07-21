@@ -45,4 +45,31 @@ class HttpClientUtilSpec extends AnyFunSpec {
     }
   }
 
+  describe("isPublicHostname") {
+    it("accepts an ordinary DNS hostname") {
+      assert(HttpClientUtil.isPublicHostname("example.com"))
+      assert(HttpClientUtil.isPublicHostname("gitbucket.example.org"))
+    }
+
+    it("rejects localhost") {
+      assert(!HttpClientUtil.isPublicHostname("localhost"))
+    }
+
+    it("rejects bare IPv4 addresses") {
+      assert(!HttpClientUtil.isPublicHostname("127.0.0.1"))
+      assert(!HttpClientUtil.isPublicHostname("192.168.1.1"))
+      assert(!HttpClientUtil.isPublicHostname("8.8.8.8"))
+    }
+
+    it("rejects IPv6 addresses") {
+      assert(!HttpClientUtil.isPublicHostname("::1"))
+      assert(!HttpClientUtil.isPublicHostname("2001:db8::1"))
+      assert(!HttpClientUtil.isPublicHostname("[::1]"))
+    }
+
+    it("does not mistake an IPv4-like hostname with a non-numeric part for an IP") {
+      assert(HttpClientUtil.isPublicHostname("999.999.999.999.example.com"))
+    }
+  }
+
 }

@@ -90,4 +90,55 @@ class OAuthServiceSpec extends AnyFunSuite with ServiceSpecBase {
     assert(OAuthService.isKnownClient("178c6fc778ccc68e1d6a"))
     assert(!OAuthService.isKnownClient("anything-else"))
   }
+
+  test("getOAuthAccessTokens returns the issued token for its owner") {
+    withTestDB { implicit session =>
+      val code = OAuthService.issueAuthorizationCode(ClientId, "root", "repo read:org gist", RedirectUri)
+      val Some((tokenId, _, scopes)) = OAuthService.exchangeCode(ClientId, code, RedirectUri): @unchecked
+
+      val tokens = OAuthService.getOAuthAccessTokens("root")
+      assert(tokens.map(_.tokenId) == List(tokenId))
+      assert(tokens.head.clientId == ClientId)
+      assert(tokens.head.scopes == scopes)
+    }
+  }
+
+  test("getOAuthAccessTokens does not return another user's tokens") {
+    withTestDB { implicit session =>
+      generateNewAccount("user2")
+      val rootCode = OAuthService.issueAuthorizationCode(ClientId, "root", "repo", RedirectUri)
+      OAuthService.exchangeCode(ClientId, rootCode, RedirectUri)
+      val user2Code = OAuthService.issueAuthorizationCode(ClientId, "user2", "gist", RedirectUri)
+      val Some((user2TokenId, _, _)) = OAuthService.exchangeCode(ClientId, user2Code, RedirectUri): @unchecked
+
+      val user2Tokens = OAuthService.getOAuthAccessTokens("user2")
+      assert(user2Tokens.map(_.tokenId) == List(user2TokenId))
+      assert(!OAuthService.getOAuthAccessTokens("root").exists(_.tokenId == user2TokenId))
+    }
+  }
+
+  test("deleteOAuthAccessToken removes the owner's token") {
+    withTestDB { implicit session =>
+      val code = OAuthService.issueAuthorizationCode(ClientId, "root", "repo", RedirectUri)
+      val Some((tokenId, token, _)) = OAuthService.exchangeCode(ClientId, code, RedirectUri): @unchecked
+
+      OAuthService.deleteOAuthAccessToken("root", tokenId)
+
+      assert(OAuthService.getOAuthAccessTokens("root").isEmpty)
+      assert(OAuthService.validateToken(token) == None)
+    }
+  }
+
+  test("deleteOAuthAccessToken cannot delete another user's token") {
+    withTestDB { implicit session =>
+      generateNewAccount("user2")
+      val code = OAuthService.issueAuthorizationCode(ClientId, "user2", "repo", RedirectUri)
+      val Some((tokenId, token, _)) = OAuthService.exchangeCode(ClientId, code, RedirectUri): @unchecked
+
+      OAuthService.deleteOAuthAccessToken("root", tokenId)
+
+      assert(OAuthService.getOAuthAccessTokens("user2").map(_.tokenId) == List(tokenId))
+      assert(OAuthService.validateToken(token).map(_.userName) == Some("user2"))
+    }
+  }
 }

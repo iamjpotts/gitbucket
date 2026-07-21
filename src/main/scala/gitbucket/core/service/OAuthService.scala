@@ -77,6 +77,12 @@ trait OAuthService {
       }
   }
 
+  def getOAuthAccessTokens(userName: String)(implicit s: Session): List[OAuthAccessToken] =
+    OAuthAccessTokens.filter(_.userName === userName.bind).sortBy(_.tokenId.desc).list
+
+  def deleteOAuthAccessToken(userName: String, tokenId: Int)(implicit s: Session): Unit =
+    OAuthAccessTokens filter (t => t.userName === userName.bind && t.tokenId === tokenId) delete
+
   def validateToken(rawToken: String)(implicit s: Session): Option[Account] =
     Accounts
       .join(OAuthAccessTokens)
