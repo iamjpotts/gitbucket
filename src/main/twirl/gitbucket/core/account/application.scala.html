@@ -1,6 +1,9 @@
 @(account: gitbucket.core.model.Account,
   personalTokens: List[gitbucket.core.model.AccessToken],
-  generatedToken: Option[(gitbucket.core.model.AccessToken, String)])(implicit context: gitbucket.core.controller.Context)
+  generatedToken: Option[(gitbucket.core.model.AccessToken, String)],
+  oauthTokens: List[gitbucket.core.model.OAuthAccessToken],
+  ghCliHint: Option[String])(implicit context: gitbucket.core.controller.Context)
+@import gitbucket.core.view.helpers
 @gitbucket.core.html.main("Applications"){
   @gitbucket.core.account.html.menu("application", context.loginAccount.get.userName, false){
     <div class="panel panel-default">
@@ -35,7 +38,7 @@
     </div>
     <form method="POST" action="@context.path/@account.userName/_personalToken" validate="true" autocomplete="off">
       <div class="panel panel-default">
-        <div class="panel-heading strong">Generate new token</div>
+        <div class="panel-heading strong">Generate new personal access token</div>
         <div class="panel-body">
           <fieldset>
             <label for="note" class="strong">Token description</label>
@@ -47,5 +50,41 @@
         </div>
       </div>
     </form>
+    <div class="panel panel-default">
+      <div class="panel-heading strong">OAuth access tokens</div>
+      <div class="panel-body">
+        @if(oauthTokens.isEmpty){
+          No tokens.
+          @ghCliHint.map { host =>
+            <br>
+            To grant access to the GitHub cli, run: <code>gh auth login --hostname @host -w</code>
+          }
+        } else {
+          <p>Since GitBucket does not currently enforce scopes, each token has full access to your account.</p>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Client ID</th>
+                <th>Created At</th>
+                <th>Scopes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @oauthTokens.map { token =>
+                <tr>
+                  <td>@token.clientId</td>
+                  <td>@helpers.date(token.createdAt)</td>
+                  <td>@token.scopes</td>
+                  <td>
+                    <a href="@context.path/@account.userName/_oauthToken/delete/@token.tokenId" class="btn btn-sm btn-danger pull-right">Delete</a>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    </div>
   }
 }

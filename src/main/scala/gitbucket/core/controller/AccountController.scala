@@ -32,6 +32,7 @@ class AccountController
     with GroupManagerAuthenticator
     with ReadableUsersAuthenticator
     with AccessTokenService
+    with OAuthService
     with WebHookService
     with PrioritiesService
     with RepositoryCreationService
@@ -40,7 +41,7 @@ class AccountController
 trait AccountControllerBase extends AccountManagementControllerBase {
   self: AccountService & RepositoryService & ActivityService & WikiService & LabelsService & SshKeyService &
     GpgKeyService & OneselfAuthenticator & UsersAuthenticator & GroupManagerAuthenticator & ReadableUsersAuthenticator &
-    AccessTokenService & WebHookService & PrioritiesService & RepositoryCreationService =>
+    AccessTokenService & OAuthService & WebHookService & PrioritiesService & RepositoryCreationService =>
 
   private case class AccountNewForm(
     userName: String,
@@ -429,7 +430,10 @@ trait AccountControllerBase extends AccountManagementControllerBase {
           }
         case _ => None
       }
-      html.application(x, tokens, generatedToken)
+      val oauthTokens = getOAuthAccessTokens(x.userName)
+      val ghCliHint =
+        if (context.baseUrl.startsWith("https://") && isPublicHostname(context.host)) Some(context.host) else None
+      html.application(x, tokens, generatedToken, oauthTokens, ghCliHint)
     } getOrElse NotFound()
   })
 
@@ -447,6 +451,15 @@ trait AccountControllerBase extends AccountManagementControllerBase {
       val userName = params("userName")
       val tokenId = params("id").toInt
       deleteAccessToken(userName, tokenId)
+      redirect(s"/$userName/_application")
+    }
+  )
+
+  get("/:userName/_oauthToken/delete/:id")(
+    oneselfOnly {
+      val userName = params("userName")
+      val tokenId = params("id").toInt
+      deleteOAuthAccessToken(userName, tokenId)
       redirect(s"/$userName/_application")
     }
   )
@@ -967,6 +980,9 @@ trait AccountControllerBase extends AccountManagementControllerBase {
       }
     }
   }
+
+  private def isPublicHostname(host: String): Boolean =
+    host != "localhost" && !host.matches("""\d{1,3}(\.\d{1,3}){3}""") && !host.contains(":")
 
   private def isGroupManager(account: Option[Account], members: Seq[GroupMember]): Boolean = {
     account.exists { account =>
