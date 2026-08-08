@@ -12,7 +12,6 @@ import gitbucket.core.service.{
   RequestCache
 }
 import gitbucket.core.util.*
-import gitbucket.core.util.Directory.*
 import gitbucket.core.util.Implicits.*
 import org.scalatra.forms.*
 import gitbucket.core.releases.html
@@ -21,7 +20,7 @@ import org.eclipse.jgit.api.Git
 
 import scala.util.Using
 
-class ReleaseController
+class ReleaseController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends ReleaseControllerBase
     with RepositoryService
     with AccountService
@@ -83,7 +82,10 @@ trait ReleaseControllerBase extends ControllerBase {
       response.setHeader("Content-Disposition", s"attachment; filename=${asset.label}")
       RawData(
         FileUtil.getSafeMimeType(asset.label),
-        new File(getReleaseFilesDir(repository.owner, repository.name), FileUtil.checkFilename(tagName + "/" + fileId))
+        new File(
+          directory.getReleaseFilesDir(repository.owner, repository.name),
+          FileUtil.checkFilename(tagName + "/" + fileId)
+        )
       )
     }).getOrElse(NotFound())
   })
@@ -116,7 +118,7 @@ trait ReleaseControllerBase extends ControllerBase {
       files.foreach { case (fileId, fileName) =>
         val size =
           new File(
-            getReleaseFilesDir(repository.owner, repository.name),
+            directory.getReleaseFilesDir(repository.owner, repository.name),
             FileUtil.checkFilename(tagName + "/" + fileId)
           ).length
         createReleaseAsset(repository.owner, repository.name, tagName, fileId, fileName, size, loginAccount)
@@ -130,7 +132,7 @@ trait ReleaseControllerBase extends ControllerBase {
   })
 
   get("/:owner/:repository/changelog/*...*")(writableUsersOnly { repository =>
-    val commitLog = Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    val commitLog = Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val Seq(previousTag, currentTag) = multiParams("splat")
 
       val commits = JGitUtil.getCommitLog(git, previousTag, currentTag).reverse
@@ -183,7 +185,7 @@ trait ReleaseControllerBase extends ControllerBase {
           files.foreach { case (fileId, fileName) =>
             val size =
               new File(
-                getReleaseFilesDir(repository.owner, repository.name),
+                directory.getReleaseFilesDir(repository.owner, repository.name),
                 FileUtil.checkFilename(tagName + "/" + fileId)
               ).length
             createReleaseAsset(repository.owner, repository.name, tagName, fileId, fileName, size, loginAccount)
@@ -192,7 +194,7 @@ trait ReleaseControllerBase extends ControllerBase {
           assets.foreach { asset =>
             if (!files.exists { case (fileId, _) => fileId == asset.fileName }) {
               val file = new File(
-                getReleaseFilesDir(repository.owner, repository.name),
+                directory.getReleaseFilesDir(repository.owner, repository.name),
                 FileUtil.checkFilename(release.tag + "/" + asset.fileName)
               )
               FileUtils.forceDelete(file)
@@ -209,7 +211,7 @@ trait ReleaseControllerBase extends ControllerBase {
     val tagName = multiParams("splat").head
     getRelease(repository.owner, repository.name, tagName).foreach { release =>
       FileUtils.deleteDirectory(
-        new File(getReleaseFilesDir(repository.owner, repository.name), FileUtil.checkFilename(release.tag))
+        new File(directory.getReleaseFilesDir(repository.owner, repository.name), FileUtil.checkFilename(release.tag))
       )
     }
     deleteRelease(repository.owner, repository.name, tagName)

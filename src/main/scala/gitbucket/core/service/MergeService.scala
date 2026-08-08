@@ -5,7 +5,7 @@ import gitbucket.core.controller.Context
 import gitbucket.core.model.{Account, Issue, PullRequest, WebHook}
 import gitbucket.core.plugin.{PluginRegistry, ReceiveHook}
 import gitbucket.core.service.RepositoryService.RepositoryInfo
-import gitbucket.core.util.Directory._
+import gitbucket.core.util.DirectoryProvider
 import gitbucket.core.util.{JGitUtil, LockUtil}
 import gitbucket.core.model.Profile.profile.blockingApi.*
 import gitbucket.core.model.activity.{CloseIssueInfo, MergeInfo, PushInfo}
@@ -22,7 +22,7 @@ import org.eclipse.jgit.revwalk.{RevCommit, RevWalk}
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
-trait MergeService {
+trait MergeService extends DirectoryProvider {
   self: AccountService & ActivityService & IssuesService & RepositoryService & PullRequestService &
     WebHookPullRequestService & WebHookService =>
 
@@ -33,7 +33,7 @@ trait MergeService {
    * Returns true if conflict will be caused.
    */
   def checkConflict(userName: String, repositoryName: String, branch: String, issueId: Int): Option[String] = {
-    Using.resource(Git.open(getRepositoryDir(userName, repositoryName))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(userName, repositoryName))) { git =>
       new MergeCacheInfo(git, userName, repositoryName, branch, issueId, Nil).checkConflict()
     }
   }
@@ -50,7 +50,7 @@ trait MergeService {
     branch: String,
     issueId: Int
   ): Option[Option[String]] = {
-    Using.resource(Git.open(getRepositoryDir(userName, repositoryName))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(userName, repositoryName))) { git =>
       new MergeCacheInfo(git, userName, repositoryName, branch, issueId, Nil).checkConflictCache()
     }
   }
@@ -155,9 +155,9 @@ trait MergeService {
     requestBranch: String,
     issueId: Int
   ): Unit = {
-    Using.resource(Git.open(getRepositoryDir(userName, repositoryName))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(userName, repositoryName))) { git =>
       git.fetch
-        .setRemote(getRepositoryDir(requestUserName, requestRepositoryName).toURI.toString)
+        .setRemote(directory.getRepositoryDir(requestUserName, requestRepositoryName).toURI.toString)
         .setRefSpecs(new RefSpec(s"refs/heads/${requestBranch}:refs/pull/${issueId}/head"))
         .call
     }
@@ -174,14 +174,14 @@ trait MergeService {
     remoteRepositoryName: String,
     remoteBranch: String
   ): Either[String, (ObjectId, ObjectId, ObjectId)] = {
-    Using.resource(Git.open(getRepositoryDir(localUserName, localRepositoryName))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(localUserName, localRepositoryName))) { git =>
       val remoteRefName = s"refs/heads/${remoteBranch}"
       val tmpRefName = s"refs/remote-temp/${remoteUserName}/${remoteRepositoryName}/${remoteBranch}"
       val refSpec = new RefSpec(s"${remoteRefName}:${tmpRefName}").setForceUpdate(true)
       try {
         // fetch objects from origin repository branch
         git.fetch
-          .setRemote(getRepositoryDir(remoteUserName, remoteRepositoryName).toURI.toString)
+          .setRemote(directory.getRepositoryDir(remoteUserName, remoteRepositoryName).toURI.toString)
           .setRefSpecs(refSpec)
           .call
         // merge conflict check
@@ -247,7 +247,7 @@ trait MergeService {
       remoteRepositoryName,
       remoteBranch
     ).map { case (newTreeId, oldBaseId, oldHeadId) =>
-      Using.resource(Git.open(getRepositoryDir(localUserName, localRepositoryName))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(localUserName, localRepositoryName))) { git =>
         val existIds = JGitUtil.getAllCommitIds(git).toSet
 
         val committer = new PersonIdent(loginAccount.fullName, loginAccount.mailAddress)
@@ -345,7 +345,7 @@ trait MergeService {
           getPullRequest(repository.owner, repository.name, issueId)
             .map {
               case (issue, pullRequest) =>
-                Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+                Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
                   val (commits, _) = getRequestCompareInfo(
                     repository.owner,
                     repository.name,

@@ -5,7 +5,6 @@ import gitbucket.core.model.{Account, Issue, PullRequest, Repository}
 import gitbucket.core.service._
 import gitbucket.core.service.IssuesService.IssueSearchCondition
 import gitbucket.core.service.PullRequestService.PullRequestLimit
-import gitbucket.core.util.Directory.getRepositoryDir
 import gitbucket.core.util.Implicits._
 import gitbucket.core.util.JGitUtil.CommitInfo
 import gitbucket.core.util._
@@ -181,7 +180,7 @@ trait ApiPullRequestControllerBase extends ControllerBase {
     val name = repository.name
     params("id").toIntOpt.flatMap { issueId =>
       getPullRequest(owner, name, issueId) map { case (issue, pullreq) =>
-        Using.resource(Git.open(getRepositoryDir(owner, name))) { git =>
+        Using.resource(Git.open(directory.getRepositoryDir(owner, name))) { git =>
           val oldId = git.getRepository.resolve(pullreq.commitIdFrom)
           val newId = git.getRepository.resolve(pullreq.commitIdTo)
           val repoFullName = RepositoryName(repository)

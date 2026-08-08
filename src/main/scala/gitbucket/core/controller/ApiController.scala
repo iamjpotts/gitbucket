@@ -7,7 +7,7 @@ import gitbucket.core.util.Implicits.*
 import gitbucket.core.util.*
 import gitbucket.core.plugin.PluginRegistry
 
-class ApiController
+class ApiController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends ApiControllerBase
     with ApiGitReferenceControllerBase
     with ApiIssueCommentControllerBase

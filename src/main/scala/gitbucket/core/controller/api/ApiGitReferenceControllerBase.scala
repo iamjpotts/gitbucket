@@ -2,7 +2,6 @@ package gitbucket.core.controller.api
 import gitbucket.core.api.{ApiError, ApiRef, CreateARef, JsonFormat, UpdateARef}
 import gitbucket.core.controller.ControllerBase
 import gitbucket.core.service.RepositoryService.RepositoryInfo
-import gitbucket.core.util.Directory.getRepositoryDir
 import gitbucket.core.util.Implicits._
 import gitbucket.core.util.{ReferrerAuthenticator, RepositoryName, WritableUsersAuthenticator}
 import org.eclipse.jgit.api.Git
@@ -20,7 +19,7 @@ trait ApiGitReferenceControllerBase extends ControllerBase {
   private val logger = LoggerFactory.getLogger(classOf[ApiGitReferenceControllerBase])
 
   get("/api/v3/repos/:owner/:repository/git/refs")(referrersOnly { repository =>
-    val result = Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    val result = Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val refs = git
         .getRepository()
         .getRefDatabase()
@@ -59,7 +58,7 @@ trait ApiGitReferenceControllerBase extends ControllerBase {
    */
   post("/api/v3/repos/:owner/:repository/git/refs")(writableUsersOnly { repository =>
     extractFromJsonBody[CreateARef].map { data =>
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val ref = git.getRepository.findRef(data.ref)
         if (ref == null) {
           val update = git.getRepository.updateRef(data.ref)
@@ -87,7 +86,7 @@ trait ApiGitReferenceControllerBase extends ControllerBase {
   patch("/api/v3/repos/:owner/:repository/git/refs/*")(writableUsersOnly { repository =>
     val refName = multiParams("splat").mkString("/")
     extractFromJsonBody[UpdateARef].map { data =>
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val ref = git.getRepository.findRef(refName)
         if (ref == null) {
           UnprocessableEntity("Ref does not exist.")
@@ -112,7 +111,7 @@ trait ApiGitReferenceControllerBase extends ControllerBase {
    */
   delete("/api/v3/repos/:owner/:repository/git/refs/*")(writableUsersOnly { _ =>
     val refName = multiParams("splat").mkString("/")
-    Using.resource(Git.open(getRepositoryDir(params("owner"), params("repository")))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(params("owner"), params("repository")))) { git =>
       val ref = git.getRepository.findRef(refName)
       if (ref == null) {
         UnprocessableEntity("Ref does not exist.")
@@ -146,7 +145,7 @@ trait ApiGitReferenceControllerBase extends ControllerBase {
           case None          => notFound()
         }
       case other =>
-        Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+        Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
           git.getRepository().findRef(other) match {
             case null => notFound()
             case ref  => ApiRef.fromRef(name, ref)

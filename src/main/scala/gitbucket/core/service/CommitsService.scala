@@ -11,11 +11,11 @@ import gitbucket.core.model.Profile.dateColumnType
 import gitbucket.core.model.activity.{CommitCommentInfo, PullRequestCommentInfo}
 import gitbucket.core.plugin.PluginRegistry
 import gitbucket.core.service.RepositoryService.RepositoryInfo
-import gitbucket.core.util.Directory._
+import gitbucket.core.util.DirectoryProvider
 import gitbucket.core.util.{FileUtil, StringUtil}
 import org.apache.commons.io.FileUtils
 
-trait CommitsService {
+trait CommitsService extends DirectoryProvider {
   self: ActivityService & PullRequestService & WebHookPullRequestReviewCommentService =>
 
   def getCommitComments(owner: String, repository: String, commitId: String, includePullRequest: Boolean)(implicit
@@ -134,7 +134,7 @@ trait CommitsService {
     newLine: Option[Int],
     diffJson: String
   ): Unit = {
-    val dir = new File(getDiffDir(owner, repository), FileUtil.checkFilename(commitId))
+    val dir = new File(directory.getDiffDir(owner, repository), FileUtil.checkFilename(commitId))
     if (!dir.exists) {
       dir.mkdirs()
     }
@@ -150,7 +150,7 @@ trait CommitsService {
     oldLine: Option[Int],
     newLine: Option[Int]
   ): Option[String] = {
-    val dir = new File(getDiffDir(owner, repository), FileUtil.checkFilename(commitId))
+    val dir = new File(directory.getDiffDir(owner, repository), FileUtil.checkFilename(commitId))
     val file = diffFile(dir, fileName, oldLine, newLine)
     if (file.exists) {
       Option(FileUtils.readFileToString(file, "UTF-8"))

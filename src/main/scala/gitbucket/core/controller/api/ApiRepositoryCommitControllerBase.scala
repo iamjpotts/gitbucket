@@ -3,7 +3,6 @@ import gitbucket.core.api.{ApiBranchCommit, ApiBranchForHeadCommit, ApiCommits, 
 import gitbucket.core.controller.ControllerBase
 import gitbucket.core.model.Account
 import gitbucket.core.service.{AccountService, CommitsService, ProtectedBranchService}
-import gitbucket.core.util.Directory.getRepositoryDir
 import gitbucket.core.util.Implicits.*
 import gitbucket.core.util.JGitUtil.{CommitInfo, getBranchesNoMergeInfo, getBranchesOfCommit}
 import gitbucket.core.util.{JGitUtil, ReferrerAuthenticator, RepositoryName}
@@ -36,7 +35,7 @@ trait ApiRepositoryCommitControllerBase extends ControllerBase {
     val path = params.get("path").filter(_.nonEmpty)
     val since = params.get("since").filter(_.nonEmpty)
     val until = params.get("until").filter(_.nonEmpty)
-    Using.resource(Git.open(getRepositoryDir(owner, name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(owner, name))) { git =>
       val repo = git.getRepository
       Using.resource(new RevWalk(repo)) { revWalk =>
         val objectId = repo.resolve(sha)
@@ -95,7 +94,7 @@ trait ApiRepositoryCommitControllerBase extends ControllerBase {
     val name = repository.name
     val sha = params("sha")
 
-    Using.resource(Git.open(getRepositoryDir(owner, name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(owner, name))) { git =>
       val repo = git.getRepository
       val objectId = repo.resolve(sha)
       val commitInfo = Using.resource(new RevWalk(repo)) { revWalk =>
@@ -156,7 +155,7 @@ trait ApiRepositoryCommitControllerBase extends ControllerBase {
    */
   get("/api/v3/repos/:owner/:repository/commits/:sha/branches-where-head")(referrersOnly { repository =>
     val sha = params("sha")
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val apiBranchForCommits = for {
         branch <- getBranchesOfCommit(git, sha)
         br <- getBranchesNoMergeInfo(git).find(_.name == branch)

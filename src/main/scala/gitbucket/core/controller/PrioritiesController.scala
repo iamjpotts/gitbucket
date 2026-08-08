@@ -9,14 +9,14 @@ import gitbucket.core.service.{
   MilestonesService,
   PrioritiesService
 }
-import gitbucket.core.util.{ReferrerAuthenticator, WritableUsersAuthenticator}
+import gitbucket.core.util.{Directory, ReferrerAuthenticator, WritableUsersAuthenticator}
 import gitbucket.core.util.Implicits._
 import gitbucket.core.util.SyntaxSugars._
 import org.scalatra.forms._
 import org.scalatra.i18n.Messages
 import org.scalatra.Ok
 
-class PrioritiesController
+class PrioritiesController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends PrioritiesControllerBase
     with IssuesService
     with RepositoryService

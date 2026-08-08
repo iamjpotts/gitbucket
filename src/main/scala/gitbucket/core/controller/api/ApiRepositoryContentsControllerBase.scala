@@ -2,7 +2,6 @@ package gitbucket.core.controller.api
 import gitbucket.core.api.{ApiCommit, ApiContents, ApiError, CreateAFile, JsonFormat}
 import gitbucket.core.controller.ControllerBase
 import gitbucket.core.service.{RepositoryCommitFileService, RepositoryService}
-import gitbucket.core.util.Directory.getRepositoryDir
 import gitbucket.core.util.JGitUtil.{CommitInfo, FileInfo, getContentFromId, getFileList}
 import gitbucket.core.util._
 import gitbucket.core.view.helpers.{isRenderable, renderMarkup}
@@ -19,7 +18,7 @@ trait ApiRepositoryContentsControllerBase extends ControllerBase {
    * https://docs.github.com/en/rest/reference/repos#get-a-repository-readme
    */
   get("/api/v3/repos/:owner/:repository/readme")(referrersOnly { repository =>
-    Using.resource(Git.open(getRepositoryDir(params("owner"), params("repository")))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(params("owner"), params("repository")))) { git =>
       val refStr = params.getOrElse("ref", repository.repository.defaultBranch)
       val files = getFileList(git, refStr, ".", maxFiles = context.settings.repositoryViewer.maxFiles)
       files // files should be sorted alphabetically.
@@ -70,7 +69,7 @@ trait ApiRepositoryContentsControllerBase extends ControllerBase {
     refStr: String,
     ignoreCase: Boolean = false
   ) = {
-    Using.resource(Git.open(getRepositoryDir(params("owner"), params("repository")))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(params("owner"), params("repository")))) { git =>
       val fileList = getFileList(git, refStr, path, maxFiles = context.settings.repositoryViewer.maxFiles)
       if (fileList.isEmpty) { // file or NotFound
         getFileInfo(git, refStr, path, ignoreCase)
@@ -148,14 +147,14 @@ trait ApiRepositoryContentsControllerBase extends ControllerBase {
         data <- extractFromJsonBody[CreateAFile]
       } yield {
         val branch = data.branch.getOrElse(repository.repository.defaultBranch)
-        val commit = Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+        val commit = Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
           val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(branch))
           revCommit.name
         }
         val fullPath = multiParams("splat").head
         val paths = fullPath.split("/")
         val path = paths.take(paths.size - 1).toList.mkString("/")
-        Using.resource(Git.open(getRepositoryDir(params("owner"), params("repository")))) { git =>
+        Using.resource(Git.open(directory.getRepositoryDir(params("owner"), params("repository")))) { git =>
           val fileInfo = getFileInfo(git, commit, fullPath, ignoreCase = false)
 
           fileInfo match {

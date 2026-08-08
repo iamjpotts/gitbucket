@@ -11,7 +11,7 @@ import gitbucket.core.model.{CommitComments => _, Session => _, *}
 import gitbucket.core.plugin.PluginRegistry
 import gitbucket.core.service.RepositoryService.RepositoryInfo
 import gitbucket.core.service.SystemSettingsService.SystemSettings
-import gitbucket.core.util.Directory.*
+import gitbucket.core.util.DirectoryProvider
 import gitbucket.core.util.Implicits.*
 import gitbucket.core.util.JGitUtil
 import gitbucket.core.util.JGitUtil.{CommitInfo, DiffInfo, getBranchesNoMergeInfo}
@@ -27,7 +27,7 @@ import org.eclipse.jgit.treewalk.{EmptyTreeIterator, TreeWalk}
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
-trait PullRequestService {
+trait PullRequestService extends DirectoryProvider {
   self: IssuesService & CommitsService & WebHookService & WebHookPullRequestService & RepositoryService & MergeService &
     ActivityService =>
   import PullRequestService.*
@@ -325,7 +325,7 @@ trait PullRequestService {
         // Update base branch
         base.foreach { _base =>
           if (pr.branch != _base) {
-            Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+            Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
               getBranchesNoMergeInfo(git)
                 .find(_.name == _base)
                 .foreach(br => updateBaseBranch(repository.owner, repository.name, issueId, br.name, br.commitId))
@@ -480,7 +480,7 @@ trait PullRequestService {
     path: String
   ): Option[DiffInfo] = {
     Using.resource(
-      Git.open(getRepositoryDir(userName, repositoryName))
+      Git.open(directory.getRepositoryDir(userName, repositoryName))
     ) { git =>
       val newId = git.getRepository.resolve(commitId)
       JGitUtil.getDiff(git, None, newId.getName, path)
@@ -497,8 +497,8 @@ trait PullRequestService {
     path: String
   ): Option[DiffInfo] = {
     Using.resources(
-      Git.open(getRepositoryDir(userName, repositoryName)),
-      Git.open(getRepositoryDir(requestUserName, requestRepositoryName))
+      Git.open(directory.getRepositoryDir(userName, repositoryName)),
+      Git.open(directory.getRepositoryDir(requestUserName, requestRepositoryName))
     ) { (oldGit, newGit) =>
       val oldId = oldGit.getRepository.resolve(branch)
       val newId = newGit.getRepository.resolve(requestCommitId)
@@ -517,8 +517,8 @@ trait PullRequestService {
     settings: SystemSettings
   ): (Seq[Seq[CommitInfo]], Seq[DiffInfo]) =
     Using.resources(
-      Git.open(getRepositoryDir(userName, repositoryName)),
-      Git.open(getRepositoryDir(requestUserName, requestRepositoryName))
+      Git.open(directory.getRepositoryDir(userName, repositoryName)),
+      Git.open(directory.getRepositoryDir(requestUserName, requestRepositoryName))
     ) { (oldGit, newGit) =>
       val oldId = oldGit.getRepository.resolve(branch)
       val newId = newGit.getRepository.resolve(requestCommitId)
@@ -615,8 +615,8 @@ trait PullRequestService {
     forkedId: String
   ): (Option[ObjectId], Option[ObjectId]) = {
     Using.resources(
-      Git.open(getRepositoryDir(originRepository.owner, originRepository.name)),
-      Git.open(getRepositoryDir(forkedRepository.owner, forkedRepository.name))
+      Git.open(directory.getRepositoryDir(originRepository.owner, originRepository.name)),
+      Git.open(directory.getRepositoryDir(forkedRepository.owner, forkedRepository.name))
     ) { case (oldGit, newGit) =>
       if (originRepository.branchList.contains(originId)) {
         val forkedId2 =

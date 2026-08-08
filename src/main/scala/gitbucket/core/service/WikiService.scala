@@ -48,12 +48,12 @@ object WikiService {
 
 }
 
-trait WikiService {
+trait WikiService extends DirectoryProvider {
   import WikiService._
 
   def createWikiRepository(loginAccount: Account, owner: String, repository: String, defaultBranch: String): Unit =
     LockUtil.lock(s"${owner}/${repository}/wiki") {
-      val dir = Directory.getWikiRepositoryDir(owner, repository)
+      val dir = directory.getWikiRepositoryDir(owner, repository)
       if (!dir.exists) {
         JGitUtil.initRepository(dir, defaultBranch)
         saveWikiPage(
@@ -73,7 +73,7 @@ trait WikiService {
    * Returns the wiki page.
    */
   def getWikiPage(owner: String, repository: String, pageName: String, branch: String): Option[WikiPageInfo] = {
-    Using.resource(Git.open(Directory.getWikiRepositoryDir(owner, repository))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(owner, repository))) { git =>
       if (!JGitUtil.isEmpty(git)) {
         val fileName = pageName + ".md"
         JGitUtil.getLatestCommitFromPath(git, fileName, branch).map { latestCommit =>
@@ -94,7 +94,7 @@ trait WikiService {
    * Returns the list of wiki page names.
    */
   def getWikiPageList(owner: String, repository: String, branch: String): List[String] = {
-    Using.resource(Git.open(Directory.getWikiRepositoryDir(owner, repository))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(owner, repository))) { git =>
       JGitUtil
         .getFileList(git, branch, ".")
         .filter(_.name.endsWith(".md"))
@@ -121,7 +121,7 @@ trait WikiService {
 
     try {
       LockUtil.lock(s"${owner}/${repository}/wiki") {
-        Using.resource(Git.open(Directory.getWikiRepositoryDir(owner, repository))) { git =>
+        Using.resource(Git.open(directory.getWikiRepositoryDir(owner, repository))) { git =>
           val reader = git.getRepository.newObjectReader
           val oldTreeIter = new CanonicalTreeParser
           oldTreeIter.reset(reader, git.getRepository.resolve(from + "^{tree}"))
@@ -240,7 +240,7 @@ trait WikiService {
     currentId: Option[String]
   ): Option[String] = {
     LockUtil.lock(s"${owner}/${repository}/wiki") {
-      Using.resource(Git.open(Directory.getWikiRepositoryDir(owner, repository))) { git =>
+      Using.resource(Git.open(directory.getWikiRepositoryDir(owner, repository))) { git =>
         val builder = DirCache.newInCore.builder()
         val inserter = git.getRepository.newObjectInserter()
         val headId = git.getRepository.resolve(Constants.HEAD + "^{commit}")
@@ -311,7 +311,7 @@ trait WikiService {
     message: String
   ): Unit = {
     LockUtil.lock(s"${owner}/${repository}/wiki") {
-      Using.resource(Git.open(Directory.getWikiRepositoryDir(owner, repository))) { git =>
+      Using.resource(Git.open(directory.getWikiRepositoryDir(owner, repository))) { git =>
         val builder = DirCache.newInCore.builder()
         val inserter = git.getRepository.newObjectInserter()
         val headId = git.getRepository.resolve(Constants.HEAD + "^{commit}")
@@ -351,7 +351,7 @@ trait WikiService {
     * @return Branch name
     */
   def getWikiBranch(owner: String, repository: String): String = {
-    Using.resource(Git.open(Directory.getWikiRepositoryDir(owner, repository))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(owner, repository))) { git =>
       git.getRepository.getBranch
     }
   }

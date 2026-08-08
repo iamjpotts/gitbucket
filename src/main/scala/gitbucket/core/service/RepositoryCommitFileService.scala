@@ -6,7 +6,6 @@ import gitbucket.core.model.activity.{CloseIssueInfo, PushInfo}
 import gitbucket.core.plugin.PluginRegistry
 import gitbucket.core.service.SystemSettingsService.SystemSettings
 import gitbucket.core.service.WebHookService.WebHookPushPayload
-import gitbucket.core.util.Directory.getRepositoryDir
 import gitbucket.core.util.JGitUtil.CommitInfo
 import gitbucket.core.util.{JGitUtil, LockUtil, StringUtil}
 import org.eclipse.jgit.api.Git
@@ -146,7 +145,7 @@ trait RepositoryCommitFileService {
     f: (Git, ObjectId, DirCacheBuilder, ObjectInserter) => R
   )(implicit s: Session, c: JsonFormat.Context): Either[String, (ObjectId, R)] = {
     LockUtil.lock(s"${repository.owner}/${repository.name}") {
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val builder = DirCache.newInCore.builder()
         val inserter = git.getRepository.newObjectInserter()
         val headName = s"refs/heads/${branch}"

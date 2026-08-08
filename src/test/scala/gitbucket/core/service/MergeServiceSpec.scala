@@ -14,7 +14,7 @@ import scala.util.Using
 import scala.jdk.CollectionConverters.*
 import gitbucket.core.controller.Context
 import gitbucket.core.plugin.ReceiveHook
-import gitbucket.core.util.Directory.*
+import gitbucket.core.util.Directory
 import gitbucket.core.util.GitSpecUtil.*
 import gitbucket.core.service.RepositoryService.RepositoryInfo
 import gitbucket.core.model.*
@@ -43,12 +43,13 @@ class MergeServiceSpec extends AnyFunSpec with ServiceSpecBase {
     with WebHookPullRequestService
     with WebHookPullRequestReviewCommentService
     with RequestCache {
+    override protected def directory: Directory = MergeServiceSpec.this.directory
     override protected def getReceiveHooks(): Seq[ReceiveHook] = Nil
   }
   val branch = "master"
   val issueId = 10
   def initRepository(owner: String, name: String): File = {
-    val dir = createTestRepository(getRepositoryDir(owner, name))
+    val dir = createTestRepository(directory.getRepositoryDir(owner, name))
     Using.resource(Git.open(dir)) { git =>
       createFile(git, "refs/heads/master", "test.txt", "hoge")
       git.branchCreate().setStartPoint(s"refs/heads/master").setName(s"refs/pull/${issueId}/head").call()
@@ -155,7 +156,7 @@ class MergeServiceSpec extends AnyFunSpec with ServiceSpecBase {
           request
         )
 
-        Using.resource(Git.open(getRepositoryDir("user1", "repo8"))) { git =>
+        Using.resource(Git.open(directory.getRepositoryDir("user1", "repo8"))) { git =>
           val commitId = createFile(git, s"refs/pull/${issueId}/head", "test.txt", "hoge2")
           assert(getFile(git, branch, "test.txt").content.get == "hoge")
 

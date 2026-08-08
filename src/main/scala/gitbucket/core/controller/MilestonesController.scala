@@ -10,13 +10,13 @@ import gitbucket.core.service.{
   RepositoryService
 }
 import gitbucket.core.util.Implicits.*
-import gitbucket.core.util.{ReferrerAuthenticator, WritableUsersAuthenticator}
+import gitbucket.core.util.{Directory, ReferrerAuthenticator, WritableUsersAuthenticator}
 import gitbucket.core.util.SyntaxSugars.*
 import gitbucket.core.view.helpers.{getAssignableUserNames, getLabels, getPriorities, searchIssue}
 import org.scalatra.forms.*
 import org.scalatra.i18n.Messages
 
-class MilestonesController
+class MilestonesController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends MilestonesControllerBase
     with MilestonesService
     with RepositoryService

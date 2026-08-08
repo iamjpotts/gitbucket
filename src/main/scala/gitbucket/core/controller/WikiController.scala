@@ -10,14 +10,13 @@ import gitbucket.core.util.*
 import gitbucket.core.util.StringUtil.*
 import gitbucket.core.util.SyntaxSugars.*
 import gitbucket.core.util.Implicits.*
-import gitbucket.core.util.Directory.*
 import org.scalatra.forms.*
 import org.eclipse.jgit.api.Git
 import org.scalatra.i18n.Messages
 
 import scala.util.Using
 
-class WikiController
+class WikiController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends WikiControllerBase
     with WikiService
     with RepositoryService
@@ -95,7 +94,7 @@ trait WikiControllerBase extends ControllerBase {
     val pageName = StringUtil.urlDecode(params("page"))
     val branch = getWikiBranch(repository.owner, repository.name)
 
-    Using.resource(Git.open(getWikiRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(repository.owner, repository.name))) { git =>
       JGitUtil.getCommitLog(git, branch, path = pageName + ".md") match {
         case Right((logs, hasNext)) => html.history(Some(pageName), logs, repository, isEditable(repository))
         case Left(_)                => NotFound()
@@ -107,7 +106,7 @@ trait WikiControllerBase extends ControllerBase {
     val pageName = StringUtil.urlDecode(params("page"))
     val Array(from, to) = params("commitId").split("\\.\\.\\.")
 
-    Using.resource(Git.open(getWikiRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(repository.owner, repository.name))) { git =>
       html.compare(
         Some(pageName),
         from,
@@ -133,7 +132,7 @@ trait WikiControllerBase extends ControllerBase {
   get("/:owner/:repository/wiki/_compare/:commitId")(referrersOnly { repository =>
     val Array(from, to) = params("commitId").split("\\.\\.\\.")
 
-    Using.resource(Git.open(getWikiRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(repository.owner, repository.name))) { git =>
       html.compare(
         None,
         from,
@@ -301,7 +300,7 @@ trait WikiControllerBase extends ControllerBase {
   })
 
   get("/:owner/:repository/wiki/_history")(referrersOnly { repository =>
-    Using.resource(Git.open(getWikiRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(repository.owner, repository.name))) { git =>
       val branch = getWikiBranch(repository.owner, repository.name)
       JGitUtil.getCommitLog(git, branch) match {
         case Right((logs, hasNext)) => html.history(None, logs, repository, isEditable(repository))
@@ -312,7 +311,7 @@ trait WikiControllerBase extends ControllerBase {
 
   get("/:owner/:repository/wiki/_blob/*")(referrersOnly { repository =>
     val path = multiParams("splat").head
-    Using.resource(Git.open(getWikiRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(repository.owner, repository.name))) { git =>
       val branch = getWikiBranch(repository.owner, repository.name)
       val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(branch))
 

@@ -1,11 +1,12 @@
 package gitbucket.core
 
-import java.io.FileOutputStream
+import java.io.{File, FileOutputStream}
 import java.nio.charset.StandardCharsets
 import java.sql.Connection
 import java.util.UUID
 import gitbucket.core.model.Activity
-import gitbucket.core.util.Directory.{ActivityLog, getRepositoryDir}
+import gitbucket.core.util.Directory
+import gitbucket.core.util.Directory.ActivityLog
 import gitbucket.core.util.{JDBCUtil, JGitUtil}
 import io.github.gitbucket.solidbase.Solidbase
 import io.github.gitbucket.solidbase.migration.{LiquibaseMigration, Migration}
@@ -18,6 +19,47 @@ import org.slf4j.LoggerFactory
 
 import java.util.logging.Level
 import scala.util.Using
+
+/**
+ * Creates missing repository directories for repositories the orphan-repair migration had to
+ * synthesize placeholders for. `getRepositoryDir` is injected (defaulting to
+ * `Directory.getRepositoryDir` at the call site below) rather than read from the `Directory`
+ * singleton directly, so tests can point this migration at an isolated directory instead of the
+ * one JVM-wide `gitbucket.home`.
+ */
+private[core] class OrphanRepositoryDirMigration(getRepositoryDir: (String, String) => File) extends Migration {
+  private val logger = LoggerFactory.getLogger(getClass)
+
+  override def migrate(moduleId: String, version: String, context: java.util.Map[String, AnyRef]): Unit = {
+    import JDBCUtil._
+
+    val conn = context.get(Solidbase.CONNECTION).asInstanceOf[Connection]
+    // The PRIVATE filter matches how placeholder repositories are inserted by the orphan-repair
+    // migration above; existing private repositories already have a directory on disk and are skipped.
+    conn
+      .select(
+        """
+          |SELECT USER_NAME, REPOSITORY_NAME, DEFAULT_BRANCH
+          |FROM REPOSITORY
+          |WHERE PRIVATE = TRUE
+          |""".stripMargin
+      ) { rs =>
+        (
+          rs.getString("USER_NAME"),
+          rs.getString("REPOSITORY_NAME"),
+          Option(rs.getString("DEFAULT_BRANCH")).filter(_.nonEmpty).getOrElse("main")
+        )
+      }
+      .foreach { case (owner, repository, defaultBranch) =>
+        val gitdir = getRepositoryDir(owner, repository)
+        if (!gitdir.exists()) {
+          logger.info(s"Create missing repository directory for ${owner}/${repository}")
+          FileUtils.forceMkdirParent(gitdir)
+          JGitUtil.initRepository(gitdir, defaultBranch)
+        }
+      }
+  }
+}
 
 object GitBucketCoreModule
     extends Module(
@@ -132,39 +174,7 @@ object GitBucketCoreModule
       new Version(
         "4.47.0.2",
         new LiquibaseMigration("update/gitbucket-core_4.47.0.2.xml"),
-        new Migration() {
-          private val logger = LoggerFactory.getLogger(getClass)
-
-          override def migrate(moduleId: String, version: String, context: java.util.Map[String, AnyRef]): Unit = {
-            import JDBCUtil._
-
-            val conn = context.get(Solidbase.CONNECTION).asInstanceOf[Connection]
-            // The PRIVATE filter matches how placeholder repositories are inserted by the orphan-repair
-            // migration above; existing private repositories already have a directory on disk and are skipped.
-            conn
-              .select(
-                """
-                  |SELECT USER_NAME, REPOSITORY_NAME, DEFAULT_BRANCH
-                  |FROM REPOSITORY
-                  |WHERE PRIVATE = TRUE
-                  |""".stripMargin
-              ) { rs =>
-                (
-                  rs.getString("USER_NAME"),
-                  rs.getString("REPOSITORY_NAME"),
-                  Option(rs.getString("DEFAULT_BRANCH")).filter(_.nonEmpty).getOrElse("main")
-                )
-              }
-              .foreach { case (owner, repository, defaultBranch) =>
-                val gitdir = getRepositoryDir(owner, repository)
-                if (!gitdir.exists()) {
-                  logger.info(s"Create missing repository directory for ${owner}/${repository}")
-                  FileUtils.forceMkdirParent(gitdir)
-                  JGitUtil.initRepository(gitdir, defaultBranch)
-                }
-              }
-          }
-        }
+        new OrphanRepositoryDirMigration(Directory.getRepositoryDir)
       ),
       new Version("4.47.0.3", new LiquibaseMigration("update/gitbucket-core_4.47.0.3.xml")),
       new Version("4.47.0.4", new LiquibaseMigration("update/gitbucket-core_4.47.0.4.xml"))

@@ -8,7 +8,7 @@ import gitbucket.core.service.{AccountService, RepositoryService}
 import gitbucket.core.ssh.SshServer
 import gitbucket.core.util.Implicits.*
 import gitbucket.core.util.StringUtil.*
-import gitbucket.core.util.{AdminAuthenticator, Mailer}
+import gitbucket.core.util.{AdminAuthenticator, Directory, Mailer}
 import org.apache.commons.io.IOUtils
 import org.apache.commons.mail.EmailException
 import org.json4s.jackson.Serialization
@@ -19,7 +19,7 @@ import org.scalatra.i18n.Messages
 import scala.collection.mutable.ListBuffer
 import scala.util.Using
 
-class SystemSettingsController
+class SystemSettingsController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends SystemSettingsControllerBase
     with AccountService
     with RepositoryService

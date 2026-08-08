@@ -3,12 +3,12 @@ package gitbucket.core.controller
 import gitbucket.core.dashboard.html
 import gitbucket.core.model.Account
 import gitbucket.core.service.*
-import gitbucket.core.util.UsersAuthenticator
+import gitbucket.core.util.{Directory, UsersAuthenticator}
 import gitbucket.core.util.Implicits.*
 import gitbucket.core.service.IssuesService.*
 import gitbucket.core.service.ActivityService.*
 
-class DashboardController
+class DashboardController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends DashboardControllerBase
     with IssuesService
     with MergeService

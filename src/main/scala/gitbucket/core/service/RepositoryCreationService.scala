@@ -4,7 +4,7 @@ import java.nio.file.Files
 import java.util.concurrent.ConcurrentHashMap
 import gitbucket.core.model.Profile.profile.blockingApi.*
 import gitbucket.core.model.activity.{CreateRepositoryInfo, ForkInfo}
-import gitbucket.core.util.Directory.*
+import gitbucket.core.util.DirectoryProvider
 import gitbucket.core.util.{FileUtil, JGitUtil, LockUtil}
 import gitbucket.core.model.{Account, Role}
 import gitbucket.core.plugin.PluginRegistry
@@ -45,7 +45,7 @@ object RepositoryCreationService {
 
 }
 
-trait RepositoryCreationService {
+trait RepositoryCreationService extends DirectoryProvider {
   self: AccountService & RepositoryService & LabelsService & WikiService & ActivityService & PrioritiesService =>
 
   def canCreateRepository(repositoryOwner: String, loginAccount: Account)(implicit session: Session): Boolean = {
@@ -115,7 +115,7 @@ trait RepositoryCreationService {
         insertDefaultPriorities(owner, name)
 
         // Create the actual repository
-        val gitdir = getRepositoryDir(owner, name)
+        val gitdir = directory.getRepositoryDir(owner, name)
         JGitUtil.initRepository(gitdir, defaultBranch)
 
         if (initOption == "README" || initOption == "EMPTY_COMMIT") {
@@ -168,7 +168,7 @@ trait RepositoryCreationService {
                 val defaultBranch = Seq("master", "main").find(branches.contains).getOrElse(branches.head)
                 saveRepositoryDefaultBranch(owner, name, defaultBranch)
                 // Change repository HEAD
-                Using.resource(Git.open(getRepositoryDir(owner, name))) { git =>
+                Using.resource(Git.open(directory.getRepositoryDir(owner, name))) { git =>
                   git.getRepository.updateRef(Constants.HEAD, true).link(Constants.R_HEADS + defaultBranch)
                 }
               }
@@ -233,20 +233,20 @@ trait RepositoryCreationService {
 
           // clone repository actually
           JGitUtil.cloneRepository(
-            getRepositoryDir(repository.owner, repository.name),
-            FileUtil.deleteIfExists(getRepositoryDir(accountName, repository.name))
+            directory.getRepositoryDir(repository.owner, repository.name),
+            FileUtil.deleteIfExists(directory.getRepositoryDir(accountName, repository.name))
           )
 
           // Create Wiki repository
           JGitUtil.cloneRepository(
-            getWikiRepositoryDir(repository.owner, repository.name),
-            FileUtil.deleteIfExists(getWikiRepositoryDir(accountName, repository.name))
+            directory.getWikiRepositoryDir(repository.owner, repository.name),
+            FileUtil.deleteIfExists(directory.getWikiRepositoryDir(accountName, repository.name))
           )
 
           // Copy LFS files
-          val lfsDir = getLfsDir(repository.owner, repository.name)
+          val lfsDir = directory.getLfsDir(repository.owner, repository.name)
           if (lfsDir.exists) {
-            FileUtils.copyDirectory(lfsDir, FileUtil.deleteIfExists(getLfsDir(accountName, repository.name)))
+            FileUtils.copyDirectory(lfsDir, FileUtil.deleteIfExists(directory.getLfsDir(accountName, repository.name)))
           }
 
           // Record activity

@@ -6,7 +6,6 @@ import gitbucket.core.model.Account
 import gitbucket.core.service.{AccountService, ReleaseService, RepositoryService}
 import gitbucket.core.servlet.Database
 import gitbucket.core.util._
-import gitbucket.core.util.Directory._
 import gitbucket.core.util.Implicits._
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.dircache.DirCache
@@ -24,7 +23,7 @@ import slick.jdbc.JdbcBackend.Session
  *
  * This servlet saves uploaded file.
  */
-class FileUploadController
+class FileUploadController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends ScalatraServlet
     with FileUploadSupport
     with RepositoryService
@@ -37,7 +36,10 @@ class FileUploadController
     execute(
       { (file, fileId) =>
         FileUtils
-          .writeByteArrayToFile(new File(getTemporaryDir(session.getId), FileUtil.checkFilename(fileId)), file.get())
+          .writeByteArrayToFile(
+            new File(directory.getTemporaryDir(session.getId), FileUtil.checkFilename(fileId)),
+            file.get()
+          )
         session += Keys.Session.Upload(fileId) -> file.name
       },
       FileUtil.isImage(_)
@@ -49,7 +51,10 @@ class FileUploadController
     execute(
       { (file, fileId) =>
         FileUtils
-          .writeByteArrayToFile(new File(getTemporaryDir(session.getId), FileUtil.checkFilename(fileId)), file.get())
+          .writeByteArrayToFile(
+            new File(directory.getTemporaryDir(session.getId), FileUtil.checkFilename(fileId)),
+            file.get()
+          )
         session += Keys.Session.Upload(fileId) -> file.name
       },
       _ => true
@@ -62,7 +67,7 @@ class FileUploadController
       { (file, fileId) =>
         FileUtils.writeByteArrayToFile(
           new File(
-            getAttachedDir(params("owner"), params("repository")),
+            directory.getAttachedDir(params("owner"), params("repository")),
             FileUtil.checkFilename(fileId + "." + FileUtil.getExtension(file.getName))
           ),
           file.get()
@@ -85,7 +90,7 @@ class FileUploadController
           { (file, fileId) =>
             val fileName = file.getName
             LockUtil.lock(s"$owner/$repository/wiki") {
-              Using.resource(Git.open(Directory.getWikiRepositoryDir(owner, repository))) { git =>
+              Using.resource(Git.open(directory.getWikiRepositoryDir(owner, repository))) { git =>
                 val builder = DirCache.newInCore.builder()
                 val inserter = git.getRepository.newObjectInserter()
                 val headId = git.getRepository.resolve(Constants.HEAD + "^{commit}")
@@ -140,7 +145,7 @@ class FileUploadController
         execute(
           { (file, fileId) =>
             FileUtils.writeByteArrayToFile(
-              new File(getReleaseFilesDir(owner, repository), FileUtil.checkFilename(tag + "/" + fileId)),
+              new File(directory.getReleaseFilesDir(owner, repository), FileUtil.checkFilename(tag + "/" + fileId)),
               file.get()
             )
           },

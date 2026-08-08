@@ -4,7 +4,6 @@ import java.io.File
 import gitbucket.core.api._
 import gitbucket.core.controller.ControllerBase
 import gitbucket.core.service.{AccountService, ReleaseService}
-import gitbucket.core.util.Directory.getReleaseFilesDir
 import gitbucket.core.util.{FileUtil, ReferrerAuthenticator, RepositoryName, WritableUsersAuthenticator}
 import gitbucket.core.util.Implicits._
 import org.apache.commons.io.FileUtils
@@ -125,7 +124,7 @@ trait ApiReleaseControllerBase extends ControllerBase {
         request.inputStream.read(buf)
         FileUtils.writeByteArrayToFile(
           new File(
-            getReleaseFilesDir(repository.owner, repository.name),
+            directory.getReleaseFilesDir(repository.owner, repository.name),
             FileUtil.checkFilename(tag + "/" + fileId)
           ),
           buf

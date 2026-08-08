@@ -8,7 +8,6 @@ import gitbucket.core.service.IssuesService.*
 import gitbucket.core.service.PullRequestService.*
 import gitbucket.core.service.RepositoryService.RepositoryInfo
 import gitbucket.core.service.*
-import gitbucket.core.util.Directory.*
 import gitbucket.core.util.Implicits.*
 import gitbucket.core.util.*
 import org.scalatra.forms.*
@@ -17,7 +16,7 @@ import org.scalatra.BadRequest
 
 import scala.util.Using
 
-class PullRequestsController
+class PullRequestsController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends PullRequestsControllerBase
     with RepositoryService
     with AccountService
@@ -262,7 +261,7 @@ trait PullRequestsControllerBase extends ControllerBase {
         } else {
           if (repository.repository.defaultBranch != pullreq.requestBranch) {
             val userName = context.loginAccount.get.userName
-            Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+            Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
               git.branchDelete().setForce(true).setBranchNames(pullreq.requestBranch).call()
               val deleteBranchInfo =
                 DeleteBranchInfo(repository.owner, repository.name, userName, pullreq.requestBranch)
@@ -384,8 +383,8 @@ trait PullRequestsControllerBase extends ControllerBase {
       case (Some(originUserName), Some(originRepositoryName)) =>
         getRepository(originUserName, originRepositoryName).map { originRepository =>
           Using.resources(
-            Git.open(getRepositoryDir(originUserName, originRepositoryName)),
-            Git.open(getRepositoryDir(forkedRepository.owner, forkedRepository.name))
+            Git.open(directory.getRepositoryDir(originUserName, originRepositoryName)),
+            Git.open(directory.getRepositoryDir(forkedRepository.owner, forkedRepository.name))
           ) { (oldGit, newGit) =>
             val newBranch = headBranch.getOrElse(JGitUtil.getDefaultBranch(newGit, forkedRepository).get._2)
             val oldBranch = originRepository.branchList
@@ -398,7 +397,7 @@ trait PullRequestsControllerBase extends ControllerBase {
           }
         } getOrElse NotFound()
       case _ =>
-        Using.resource(Git.open(getRepositoryDir(forkedRepository.owner, forkedRepository.name))) { git =>
+        Using.resource(Git.open(directory.getRepositoryDir(forkedRepository.owner, forkedRepository.name))) { git =>
           JGitUtil.getDefaultBranch(git, forkedRepository).map { case (_, defaultBranch) =>
             redirect(
               s"/${forkedRepository.owner}/${forkedRepository.name}/compare/${defaultBranch}...${headBranch.getOrElse(defaultBranch)}${quickQuery}"
@@ -618,8 +617,8 @@ trait PullRequestsControllerBase extends ControllerBase {
       originRepository <- getRepository(originOwner, originRepositoryName)
     } yield {
       Using.resources(
-        Git.open(getRepositoryDir(originRepository.owner, originRepository.name)),
-        Git.open(getRepositoryDir(forkedRepository.owner, forkedRepository.name))
+        Git.open(directory.getRepositoryDir(originRepository.owner, originRepository.name)),
+        Git.open(directory.getRepositoryDir(forkedRepository.owner, forkedRepository.name))
       ) { case (oldGit, newGit) =>
         val originBranch = JGitUtil.getDefaultBranch(oldGit, originRepository, tmpOriginBranch).get._2
         val forkedBranch = JGitUtil.getDefaultBranch(newGit, forkedRepository, tmpForkedBranch).get._2
@@ -695,7 +694,7 @@ trait PullRequestsControllerBase extends ControllerBase {
       context.loginAccount.map(x => Seq(x.mailAddress) ++ getAccountExtraMailAddresses(x.userName)).getOrElse(Nil)
 
     val branches =
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         JGitUtil
           .getBranches(
             git = git,
@@ -777,7 +776,7 @@ trait PullRequestsControllerBase extends ControllerBase {
         val baseBranch = pullreq.branch
         val revertBranch = s"revert-pr-$issueId-${System.currentTimeMillis()}"
 
-        Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+        Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
           try {
             // Create a new branch from base
             JGitUtil.createBranch(git, baseBranch, revertBranch)

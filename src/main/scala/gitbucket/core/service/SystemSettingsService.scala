@@ -6,11 +6,11 @@ import com.nimbusds.oauth2.sdk.auth.Secret
 import com.nimbusds.oauth2.sdk.id.{ClientID, Issuer}
 import gitbucket.core.service.SystemSettingsService.{getOptionValue, _}
 import gitbucket.core.util.ConfigUtil._
-import gitbucket.core.util.Directory._
+import gitbucket.core.util.DirectoryProvider
 
 import scala.util.Using
 
-trait SystemSettingsService {
+trait SystemSettingsService extends DirectoryProvider {
 
   def baseUrl(implicit request: HttpServletRequest): String = loadSystemSettings().baseUrl(request)
 
@@ -98,15 +98,15 @@ trait SystemSettingsService {
     props.setProperty(DefaultBranch, settings.defaultBranch)
     props.setProperty(ShowFullName, settings.showFullName.toString)
 
-    Using.resource(new java.io.FileOutputStream(GitBucketConf)) { out =>
+    Using.resource(new java.io.FileOutputStream(directory.GitBucketConf)) { out =>
       props.store(out, null)
     }
   }
 
   def loadSystemSettings(): SystemSettings = {
     val props = new java.util.Properties()
-    if (GitBucketConf.exists) {
-      Using.resource(new java.io.FileInputStream(GitBucketConf)) { in =>
+    if (directory.GitBucketConf.exists) {
+      Using.resource(new java.io.FileInputStream(directory.GitBucketConf)) { in =>
         props.load(in)
       }
     }

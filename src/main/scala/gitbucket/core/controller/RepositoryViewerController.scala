@@ -11,7 +11,6 @@ import gitbucket.core.service.RepositoryCommitFileService.CommitFile
 import gitbucket.core.util.*
 import gitbucket.core.util.StringUtil.*
 import gitbucket.core.util.Implicits.*
-import gitbucket.core.util.Directory.*
 import gitbucket.core.model.{Account, WebHook}
 import gitbucket.core.service.RepositoryService.RepositoryInfo
 import gitbucket.core.service.WebHookService.{WebHookCreatePayload, WebHookPushPayload}
@@ -37,7 +36,7 @@ import org.json4s.jackson.Serialization
 import org.scalatra.*
 import org.scalatra.i18n.Messages
 
-class RepositoryViewerController
+class RepositoryViewerController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends RepositoryViewerControllerBase
     with RepositoryService
     with RepositoryCommitFileService
@@ -235,7 +234,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
     val (branchName, path) = repository.splitPath(multiParams("splat").head)
     val page = params.get("page").flatMap(_.toIntOpt).getOrElse(1)
 
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       JGitUtil.getCommitLog(git, branchName, page, 30, path) match {
         case Right((logs, hasNext)) =>
           html.commits(
@@ -268,7 +267,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
       val protectedBranch = getProtectedBranchInfo(repository.owner, repository.name, branch)
         .needStatusCheck(loginAccount.userName)
 
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(branch))
 
         html.editor(
@@ -289,7 +288,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
       val (branch, path) = repository.splitPath(multiParams("splat").head)
       val protectedBranch = getProtectedBranchInfo(repository.owner, repository.name, branch)
         .needStatusCheck(loginAccount.userName)
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(branch))
         html.upload(
           branch,
@@ -323,7 +322,9 @@ trait RepositoryViewerControllerBase extends ControllerBase {
 
         newFiles.foreach { file =>
           val bytes =
-            FileUtils.readFileToByteArray(new File(getTemporaryDir(session.getId), FileUtil.checkFilename(file.id)))
+            FileUtils.readFileToByteArray(
+              new File(directory.getTemporaryDir(session.getId), FileUtil.checkFilename(file.id))
+            )
           builder.add(
             JGitUtil.createDirCacheEntry(file.name, FileMode.REGULAR_FILE, inserter.insert(Constants.OBJ_BLOB, bytes))
           )
@@ -384,7 +385,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
       val protectedBranch = getProtectedBranchInfo(repository.owner, repository.name, branch)
         .needStatusCheck(loginAccount.userName)
 
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(branch))
 
         getPathObjectId(git, path, revCommit)
@@ -411,7 +412,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
 
   get("/:owner/:repository/remove/*")(writableUsersOnly { repository =>
     val (branch, path) = repository.splitPath(multiParams("splat").head)
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(branch))
 
       getPathObjectId(git, path, revCommit).map { objectId =>
@@ -606,7 +607,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
     loginAccount: Account
   ): String = {
     val newBranchName = getNewBranchName(repository, loginAccount)
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       JGitUtil.createBranch(git, baseBranchName, newBranchName)
     }
     // Call webhook
@@ -665,7 +666,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
 
   get("/:owner/:repository/raw/*")(referrersOnly { repository =>
     val (id, path) = repository.splitPath(multiParams("splat").head)
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(id))
 
       getPathObjectId(git, path, revCommit).map { objectId =>
@@ -681,7 +682,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
     val (id, path) = repository.splitPath(multiParams("splat").head)
     val raw = params.get("raw").getOrElse("false").toBoolean
     val highlighterTheme = getSyntaxHighlighterTheme()
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(id))
       getPathObjectId(git, path, revCommit).map { objectId =>
         if (raw) {
@@ -731,7 +732,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
   ajaxGet("/:owner/:repository/get-blame/*")(referrersOnly { repository =>
     val (id, path) = repository.splitPath(multiParams("splat").head)
     contentType = formats("json")
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val last = git.log.add(git.getRepository.resolve(id)).addPath(path).setMaxCount(1).call.iterator.next.name
       Serialization.write(
         Map(
@@ -764,7 +765,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
     val id = params("id")
 
     try {
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(id))
         val diffs = JGitUtil.getDiffs(
           git = git,
@@ -799,7 +800,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
 
   get("/:owner/:repository/patch/:id")(referrersOnly { repository =>
     try {
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val diff = JGitUtil.getPatch(git, None, params("id"))
         contentType = formats("txt")
         diff
@@ -812,7 +813,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
   get("/:owner/:repository/patch/*...*")(referrersOnly { repository =>
     try {
       val Seq(fromId, toId) = multiParams("splat")
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val diff = JGitUtil.getPatch(git, Some(fromId), toId)
         contentType = formats("txt")
         diff
@@ -939,7 +940,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
    */
   get("/:owner/:repository/branches")(referrersOnly { repository =>
     val protectedBranches = getProtectedBranchList(repository.owner, repository.name).toSet
-    val branches = Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    val branches = Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       JGitUtil
         .getBranches(
           git = git,
@@ -978,7 +979,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
    * Creates a tag.
    */
   post("/:owner/:repository/tag", tagForm)(writableUsersOnly { (form, repository) =>
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       JGitUtil.createTag(git, form.tagName, form.message, form.commitId)
     } match {
       case Right(message) =>
@@ -996,7 +997,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
   post("/:owner/:repository/branches")(writableUsersOnly { repository =>
     val newBranchName = params.getOrElse("new", halt(400))
     val fromBranchName = params.getOrElse("from", halt(400))
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       JGitUtil.createBranch(git, fromBranchName, newBranchName) match {
         case Right(message) =>
           flash.update("info", message)
@@ -1053,7 +1054,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
     context.withLoginAccount { loginAccount =>
       val branchName = multiParams("splat").head
       if (repository.repository.defaultBranch != branchName) {
-        Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+        Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
           git.branchDelete().setForce(true).setBranchNames(branchName).call()
           val deleteBranchInfo =
             DeleteBranchInfo(repository.owner, repository.name, loginAccount.userName, branchName)
@@ -1103,7 +1104,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
    * Displays the file find of branch.
    */
   get("/:owner/:repository/find/*")(referrersOnly { repository =>
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val ref = multiParams("splat").head
       JGitUtil.getTreeId(git, ref).map { treeId =>
         html.find(ref, treeId, repository)
@@ -1115,7 +1116,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
    * Get all file list of branch.
    */
   ajaxGet("/:owner/:repository/tree-list/:tree")(referrersOnly { repository =>
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val treeId = params("tree")
       contentType = formats("json")
       Map("paths" -> JGitUtil.getAllFileListByTreeId(git, treeId))
@@ -1135,7 +1136,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
    * @return HTML of the file list
    */
   private def fileList(repository: RepositoryService.RepositoryInfo, revstr: String = "", path: String = ".") = {
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       if (JGitUtil.isEmpty(git)) {
         html.guide(repository, hasDeveloperRole(repository.owner, repository.name, context.loginAccount))
       } else {
@@ -1165,7 +1166,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
               path -> StringUtil.convertFromByteArray(
                 JGitUtil
                   .getContentFromId(
-                    Git.open(getRepositoryDir(repository.owner, repository.name)),
+                    Git.open(directory.getRepositoryDir(repository.owner, repository.name)),
                     file.id,
                     fetchLargeFile = true
                   )
@@ -1205,7 +1206,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
     def archive[A <: ArchiveEntry](revision: String, archiveFormat: String, archive: ArchiveOutputStream[A])(
       entryCreator: (String, Long, java.util.Date, Int) => A
     ): Unit = {
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         val oid = git.getRepository.resolve(revision)
         val commit = JGitUtil.getRevCommitFromId(git, oid)
         val date = commit.getCommitterIdent.getWhen
@@ -1325,7 +1326,7 @@ trait RepositoryViewerControllerBase extends ControllerBase {
       val branch = params("branch")
 
       LockUtil.lock(s"$owner/$repository") {
-        Using.resource(Git.open(getRepositoryDir(owner, repository))) { git =>
+        Using.resource(Git.open(directory.getRepositoryDir(owner, repository))) { git =>
           val headName = s"refs/heads/$branch"
           val headTip = git.getRepository.resolve(headName)
           if (headTip.getName != value) {

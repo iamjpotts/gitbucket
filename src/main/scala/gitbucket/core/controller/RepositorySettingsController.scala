@@ -10,7 +10,6 @@ import gitbucket.core.util.*
 import gitbucket.core.util.JGitUtil.*
 import gitbucket.core.util.SyntaxSugars.*
 import gitbucket.core.util.Implicits.*
-import gitbucket.core.util.Directory.*
 import gitbucket.core.model.WebHookContentType
 import gitbucket.core.model.activity.RenameRepositoryInfo
 import org.scalatra.forms.*
@@ -22,7 +21,7 @@ import org.eclipse.jgit.lib.ObjectId
 import scala.util.Using
 import org.scalatra.{Forbidden, Ok}
 
-class RepositorySettingsController
+class RepositorySettingsController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends RepositorySettingsControllerBase
     with RepositoryService
     with AccountService
@@ -187,7 +186,7 @@ trait RepositorySettingsControllerBase extends ControllerBase {
     } else {
       saveRepositoryDefaultBranch(repository.owner, repository.name, form.defaultBranch)
       // Change repository HEAD
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         git.getRepository.updateRef(Constants.HEAD, true).link(Constants.R_HEADS + form.defaultBranch)
       }
       flash.update("info", "Repository default branch has been updated.")
@@ -283,7 +282,7 @@ trait RepositorySettingsControllerBase extends ControllerBase {
         Array(h.getName, h.getValue)
       }
 
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       import scala.concurrent.duration.*
       import scala.concurrent.*
       import scala.jdk.CollectionConverters.*
@@ -460,7 +459,7 @@ trait RepositorySettingsControllerBase extends ControllerBase {
    */
   post("/:owner/:repository/settings/gc")(ownerOnly { repository =>
     LockUtil.lock(s"${repository.owner}/${repository.name}") {
-      Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+      Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
         git.gc().call()
       }
     }

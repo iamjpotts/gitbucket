@@ -9,14 +9,14 @@ import gitbucket.core.service.{
   MilestonesService,
   PrioritiesService
 }
-import gitbucket.core.util.{ReferrerAuthenticator, WritableUsersAuthenticator}
+import gitbucket.core.util.{Directory, ReferrerAuthenticator, WritableUsersAuthenticator}
 import gitbucket.core.util.Implicits.*
 import gitbucket.core.util.SyntaxSugars.*
 import org.scalatra.forms.*
 import org.scalatra.i18n.Messages
 import org.scalatra.Ok
 
-class LabelsController
+class LabelsController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends LabelsControllerBase
     with IssuesService
     with RepositoryService

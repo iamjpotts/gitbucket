@@ -27,7 +27,7 @@ import org.mockito.Mockito.*
 import scala.util.Random
 import scala.util.Using
 
-trait ServiceSpecBase {
+trait ServiceSpecBase extends gitbucket.core.util.DirectoryProvider {
 
   val request: HttpServletRequest = mock(classOf[HttpServletRequest])
   val session: HttpSession = mock(classOf[HttpSession])
@@ -115,6 +115,17 @@ trait ServiceSpecBase {
 
   def user(name: String)(implicit s: Session): Account = AccountService.getAccountByUserName(name).get
 
+  /**
+   * The single Directory instance this test base uses, provided explicitly to `dummyService`
+   * below (mirroring how `ScalatraBootstrap` provides it to controllers in production) instead
+   * of letting each mixed-in service reach for the `Directory` object independently. Declared as
+   * an `override def` (rather than a plain `val`) so it's recognized as the same member that
+   * DirectoryProvider declares, not a competing one — tests that mix in ServiceSpecBase alongside
+   * a service trait directly (both DirectoryProvider descendants) would otherwise hit a diamond-
+   * inheritance conflict.
+   */
+  override protected def directory: Directory = gitbucket.core.util.Directory
+
   lazy val dummyService = new RepositoryService
     with AccountService
     with ActivityService
@@ -130,6 +141,7 @@ trait ServiceSpecBase {
     with WebHookPullRequestService
     with WebHookPullRequestReviewCommentService
     with RequestCache {
+    override protected def directory: Directory = ServiceSpecBase.this.directory
     override def fetchAsPullRequest(
       userName: String,
       repositoryName: String,
@@ -142,7 +154,7 @@ trait ServiceSpecBase {
 
   def generateNewUserWithDBRepository(userName: String, repositoryName: String)(implicit s: Session): Account = {
     val ac = AccountService.getAccountByUserName(userName).getOrElse(generateNewAccount(userName))
-    val dir = Directory.getRepositoryDir(userName, repositoryName)
+    val dir = directory.getRepositoryDir(userName, repositoryName)
     if (dir.exists()) {
       FileUtils.deleteQuietly(dir)
     }

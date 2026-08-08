@@ -3,7 +3,6 @@ package gitbucket.core.service
 import gitbucket.core.model.Issue
 import gitbucket.core.util._
 import gitbucket.core.util.StringUtil
-import Directory._
 import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.treewalk.TreeWalk
 import org.eclipse.jgit.lib.FileMode
@@ -11,7 +10,7 @@ import org.eclipse.jgit.api.Git
 import gitbucket.core.model.Profile.profile.blockingApi._
 import scala.util.Using
 
-trait RepositorySearchService { self: IssuesService =>
+trait RepositorySearchService extends DirectoryProvider { self: IssuesService =>
   import RepositorySearchService._
 
   def countIssues(owner: String, repository: String, query: String, pullRequest: Boolean)(implicit
@@ -36,12 +35,12 @@ trait RepositorySearchService { self: IssuesService =>
     }
 
   def countFiles(owner: String, repository: String, query: String): Int =
-    Using.resource(Git.open(getRepositoryDir(owner, repository))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(owner, repository))) { git =>
       if (JGitUtil.isEmpty(git)) 0 else searchRepositoryFiles(git, query).length
     }
 
   def searchFiles(owner: String, repository: String, query: String): List[FileSearchResult] =
-    Using.resource(Git.open(getRepositoryDir(owner, repository))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(owner, repository))) { git =>
       if (JGitUtil.isEmpty(git)) {
         Nil
       } else {
@@ -55,12 +54,12 @@ trait RepositorySearchService { self: IssuesService =>
     }
 
   def countWikiPages(owner: String, repository: String, query: String): Int =
-    Using.resource(Git.open(Directory.getWikiRepositoryDir(owner, repository))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(owner, repository))) { git =>
       if (JGitUtil.isEmpty(git)) 0 else searchRepositoryFiles(git, query).length
     }
 
   def searchWikiPages(owner: String, repository: String, query: String): List[FileSearchResult] =
-    Using.resource(Git.open(Directory.getWikiRepositoryDir(owner, repository))) { git =>
+    Using.resource(Git.open(directory.getWikiRepositoryDir(owner, repository))) { git =>
       if (JGitUtil.isEmpty(git)) {
         Nil
       } else {

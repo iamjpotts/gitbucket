@@ -3,7 +3,6 @@ import gitbucket.core.api._
 import gitbucket.core.controller.ControllerBase
 import gitbucket.core.service.{AccountService, RepositoryCreationService, RepositoryService}
 import gitbucket.core.servlet.Database
-import gitbucket.core.util.Directory.getRepositoryDir
 import gitbucket.core.util._
 import gitbucket.core.util.Implicits._
 import gitbucket.core.model.Profile.profile.blockingApi._
@@ -188,7 +187,7 @@ trait ApiRepositoryControllerBase extends ControllerBase {
    * https://docs.github.com/en/rest/reference/repos#list-repository-tags
    */
   get("/api/v3/repos/:owner/:repository/tags")(referrersOnly { repository =>
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       JsonFormat(
         repository.tags.map(tagInfo => ApiTag(tagInfo.name, RepositoryName(repository), tagInfo.commitId))
       )
@@ -306,7 +305,7 @@ trait ApiRepositoryControllerBase extends ControllerBase {
    */
   get("/api/v3/repos/:owner/:repository/raw/*")(referrersOnly { repository =>
     val (id, path) = repository.splitPath(multiParams("splat").head)
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       val revCommit = JGitUtil.getRevCommitFromId(git, git.getRepository.resolve(id))
 
       getPathObjectId(git, path, revCommit).map { objectId =>

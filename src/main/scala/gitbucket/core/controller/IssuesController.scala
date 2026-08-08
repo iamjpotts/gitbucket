@@ -10,7 +10,7 @@ import gitbucket.core.view.helpers
 import org.scalatra.forms.*
 import org.scalatra.{BadRequest, Ok}
 
-class IssuesController
+class IssuesController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends IssuesControllerBase
     with IssuesService
     with RepositoryService
@@ -480,7 +480,7 @@ trait IssuesControllerBase extends ControllerBase {
   })
 
   get("/:owner/:repository/_attached/:file")(referrersOnly { repository =>
-    (Directory.getAttachedDir(repository.owner, repository.name) match {
+    (directory.getAttachedDir(repository.owner, repository.name) match {
       case dir if dir.exists && dir.isDirectory =>
         dir.listFiles.find(_.getName.startsWith(params("file") + ".")).map { file =>
           response.setHeader("Content-Disposition", f"""inline; filename=${file.getName}""")

@@ -9,7 +9,6 @@ import gitbucket.core.service._
 import gitbucket.core.service.WebHookService._
 import gitbucket.core.ssh.SshUtil
 import gitbucket.core.util.SyntaxSugars._
-import gitbucket.core.util.Directory._
 import gitbucket.core.util.Implicits._
 import gitbucket.core.util.StringUtil._
 import gitbucket.core.util._
@@ -18,7 +17,7 @@ import org.scalatra.BadRequest
 import org.scalatra.forms._
 import org.scalatra.Forbidden
 
-class AccountController
+class AccountController(override protected val directory: Directory = gitbucket.core.util.Directory)
     extends AccountControllerBase
     with AccountService
     with RepositoryService
@@ -297,7 +296,10 @@ trait AccountControllerBase extends AccountManagementControllerBase {
         account.image
           .map { image =>
             Some(
-              RawData(FileUtil.getMimeType(image), new File(getUserUploadDir(userName), FileUtil.checkFilename(image)))
+              RawData(
+                FileUtil.getMimeType(image),
+                new File(directory.getUserUploadDir(userName), FileUtil.checkFilename(image))
+              )
             )
           }
           .getOrElse {

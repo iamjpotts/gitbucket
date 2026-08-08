@@ -15,6 +15,10 @@ class ScalatraBootstrap extends LifeCycle with SystemSettingsService {
       context.getSessionCookieConfig.setSecure(true)
     }
 
+    // The single Directory instance this process uses, provided explicitly to every controller
+    // below rather than having each one reach for the Directory object independently.
+    val directory: Directory = Directory
+
     // Register TransactionFilter at first
     context.addFilter("transactionFilter", new TransactionFilter)
     context
@@ -30,30 +34,30 @@ class ScalatraBootstrap extends LifeCycle with SystemSettingsService {
       .addMappingForUrlPatterns(EnumSet.allOf(classOf[DispatcherType]), true, "/api/*")
 
     // Register controllers
-    context.mount(new PreProcessController, "/*")
+    context.mount(new PreProcessController(directory), "/*")
 
     context.addFilter("pluginControllerFilter", new PluginControllerFilter)
     context
       .getFilterRegistration("pluginControllerFilter")
       .addMappingForUrlPatterns(EnumSet.allOf(classOf[DispatcherType]), true, "/*")
 
-    context.mount(new FileUploadController, "/upload")
+    context.mount(new FileUploadController(directory), "/upload")
 
     val filter = new CompositeScalatraFilter()
-    filter.mount(new IndexController, "/")
-    filter.mount(new ApiController, "/api/v3")
-    filter.mount(new SystemSettingsController, "/admin")
-    filter.mount(new DashboardController, "/*")
-    filter.mount(new AccountController, "/*")
-    filter.mount(new RepositoryViewerController, "/*")
-    filter.mount(new WikiController, "/*")
-    filter.mount(new LabelsController, "/*")
-    filter.mount(new PrioritiesController, "/*")
-    filter.mount(new MilestonesController, "/*")
-    filter.mount(new IssuesController, "/*")
-    filter.mount(new PullRequestsController, "/*")
-    filter.mount(new ReleaseController, "/*")
-    filter.mount(new RepositorySettingsController, "/*")
+    filter.mount(new IndexController(directory), "/")
+    filter.mount(new ApiController(directory), "/api/v3")
+    filter.mount(new SystemSettingsController(directory), "/admin")
+    filter.mount(new DashboardController(directory), "/*")
+    filter.mount(new AccountController(directory), "/*")
+    filter.mount(new RepositoryViewerController(directory), "/*")
+    filter.mount(new WikiController(directory), "/*")
+    filter.mount(new LabelsController(directory), "/*")
+    filter.mount(new PrioritiesController(directory), "/*")
+    filter.mount(new MilestonesController(directory), "/*")
+    filter.mount(new IssuesController(directory), "/*")
+    filter.mount(new PullRequestsController(directory), "/*")
+    filter.mount(new ReleaseController(directory), "/*")
+    filter.mount(new RepositorySettingsController(directory), "/*")
 
     context.addFilter("compositeScalatraFilter", filter)
     context
@@ -61,7 +65,7 @@ class ScalatraBootstrap extends LifeCycle with SystemSettingsService {
       .addMappingForUrlPatterns(EnumSet.allOf(classOf[DispatcherType]), true, "/*")
 
     // Create GITBUCKET_HOME directory if it does not exist
-    val dir = new java.io.File(Directory.GitBucketHome)
+    val dir = new java.io.File(directory.GitBucketHome)
     if (!dir.exists) {
       dir.mkdirs()
     }

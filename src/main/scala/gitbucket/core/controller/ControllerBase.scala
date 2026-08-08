@@ -5,7 +5,6 @@ import gitbucket.core.api.{ApiError, JsonFormat}
 import gitbucket.core.model.Account
 import gitbucket.core.service.{AccountService, RepositoryService, SystemSettingsService}
 import gitbucket.core.util.SyntaxSugars.*
-import gitbucket.core.util.Directory.*
 import gitbucket.core.util.Implicits.*
 import gitbucket.core.util.*
 import org.json4s.*
@@ -42,7 +41,8 @@ abstract class ControllerBase
     with I18nSupport
     with FlashMapSupport
     with Validations
-    with SystemSettingsService {
+    with SystemSettingsService
+    with DirectoryProvider {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -396,19 +396,19 @@ trait AccountManagementControllerBase extends ControllerBase {
   protected def updateImage(userName: String, fileId: Option[String], clearImage: Boolean): Unit =
     if (clearImage) {
       getAccountByUserName(userName).flatMap(_.image).foreach { image =>
-        new File(getUserUploadDir(userName), FileUtil.checkFilename(image)).delete()
+        new File(directory.getUserUploadDir(userName), FileUtil.checkFilename(image)).delete()
         updateAvatarImage(userName, None)
       }
     } else {
       try {
         fileId.foreach { fileId =>
           val filename = "avatar." + FileUtil.getExtension(session.getAndRemove(Keys.Session.Upload(fileId)).get)
-          val uploadDir = getUserUploadDir(userName)
+          val uploadDir = directory.getUserUploadDir(userName)
           if (!uploadDir.exists) {
             uploadDir.mkdirs()
           }
           Thumbnails
-            .of(new File(getTemporaryDir(session.getId), FileUtil.checkFilename(fileId)))
+            .of(new File(directory.getTemporaryDir(session.getId), FileUtil.checkFilename(fileId)))
             .size(324, 324)
             .toFile(new File(uploadDir, FileUtil.checkFilename(filename)))
           updateAvatarImage(userName, Some(filename))

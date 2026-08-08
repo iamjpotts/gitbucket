@@ -3,7 +3,6 @@ import gitbucket.core.api.*
 import gitbucket.core.controller.ControllerBase
 import gitbucket.core.service.{AccountService, ProtectedBranchService, RepositoryService}
 import gitbucket.core.util.*
-import gitbucket.core.util.Directory.*
 import gitbucket.core.util.Implicits.*
 import gitbucket.core.util.JGitUtil.getBranchesNoMergeInfo
 import org.eclipse.jgit.api.Git
@@ -20,7 +19,7 @@ trait ApiRepositoryBranchControllerBase extends ControllerBase {
    * https://docs.github.com/en/rest/reference/repos#list-branches
    */
   get("/api/v3/repos/:owner/:repository/branches")(referrersOnly { repository =>
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       JsonFormat(
         JGitUtil
           .getBranchesNoMergeInfo(git)
@@ -36,7 +35,7 @@ trait ApiRepositoryBranchControllerBase extends ControllerBase {
    * https://docs.github.com/en/rest/reference/repos#get-a-branch
    */
   get("/api/v3/repos/:owner/:repository/branches/*")(referrersOnly { repository =>
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       (for {
         branch <- params.get("splat") if repository.branchList.contains(branch)
         br <- getBranchesNoMergeInfo(git).find(_.name == branch)
@@ -261,7 +260,7 @@ trait ApiRepositoryBranchControllerBase extends ControllerBase {
    */
   patch("/api/v3/repos/:owner/:repository/branches/*")(ownerOnly { repository =>
     import gitbucket.core.api.*
-    Using.resource(Git.open(getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       (for {
         branch <- params.get("splat") if repository.branchList.contains(branch)
         protection <- extractFromJsonBody[ApiBranchProtectionRequest.EnablingAndDisabling].map(_.protection)

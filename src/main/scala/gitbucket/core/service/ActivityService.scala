@@ -1,7 +1,7 @@
 package gitbucket.core.service
 
 import gitbucket.core.model.Activity
-import gitbucket.core.util.Directory._
+import gitbucket.core.util.DirectoryProvider
 import org.json4s._
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{read, write}
@@ -16,13 +16,13 @@ import ActivityService._
 
 import scala.collection.mutable.ListBuffer
 
-trait ActivityService {
+trait ActivityService extends DirectoryProvider {
   self: RequestCache =>
 
   private implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
   private def writeLog(activity: Activity): Unit = {
-    Using.resource(new FileOutputStream(ActivityLog, true)) { out =>
+    Using.resource(new FileOutputStream(directory.ActivityLog, true)) { out =>
       out.write((write(activity) + "\n").getBytes(StandardCharsets.UTF_8))
     }
   }
@@ -52,14 +52,14 @@ trait ActivityService {
   private def getActivities(
     includePublic: Boolean
   )(filter: Activity => Boolean)(implicit context: Context): List[Activity] = {
-    if (!isNewsFeedEnabled || !ActivityLog.exists()) {
+    if (!isNewsFeedEnabled || !directory.ActivityLog.exists()) {
       List.empty
     } else {
       val list = new ListBuffer[Activity]
       Using.resource(
         ReversedLinesFileReader
           .builder()
-          .setFile(ActivityLog)
+          .setFile(directory.ActivityLog)
           .setCharset(StandardCharsets.UTF_8)
           .get()
       ) { reader =>

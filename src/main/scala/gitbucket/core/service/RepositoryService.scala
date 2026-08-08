@@ -7,7 +7,6 @@ import gitbucket.core.model.Profile._
 import gitbucket.core.model.Profile.profile.blockingApi._
 import gitbucket.core.model.Profile.dateColumnType
 import gitbucket.core.plugin.PluginRegistry
-import gitbucket.core.util.Directory.{getRepositoryDir, getRepositoryFilesDir, getTemporaryDir, getWikiRepositoryDir}
 import gitbucket.core.util.JGitUtil.FileInfo
 import org.apache.commons.io.FileUtils
 import org.eclipse.jgit.api.Git
@@ -15,7 +14,7 @@ import org.eclipse.jgit.lib.{Repository => _}
 
 import scala.util.Using
 
-trait RepositoryService {
+trait RepositoryService extends DirectoryProvider {
   self: AccountService =>
   import RepositoryService._
 
@@ -94,22 +93,22 @@ trait RepositoryService {
           // TODO Drop transferred owner from collaborators?
 
           // Move git repository
-          val repoDir = getRepositoryDir(oldUserName, oldRepositoryName)
+          val repoDir = directory.getRepositoryDir(oldUserName, oldRepositoryName)
           if (repoDir.isDirectory) {
-            FileUtils.moveDirectory(repoDir, getRepositoryDir(newUserName, newRepositoryName))
+            FileUtils.moveDirectory(repoDir, directory.getRepositoryDir(newUserName, newRepositoryName))
           }
           // Move wiki repository
-          val wikiDir = getWikiRepositoryDir(oldUserName, oldRepositoryName)
+          val wikiDir = directory.getWikiRepositoryDir(oldUserName, oldRepositoryName)
           if (wikiDir.isDirectory) {
-            FileUtils.moveDirectory(wikiDir, getWikiRepositoryDir(newUserName, newRepositoryName))
+            FileUtils.moveDirectory(wikiDir, directory.getWikiRepositoryDir(newUserName, newRepositoryName))
           }
           // Move files directory
-          val filesDir = getRepositoryFilesDir(oldUserName, oldRepositoryName)
+          val filesDir = directory.getRepositoryFilesDir(oldUserName, oldRepositoryName)
           if (filesDir.isDirectory) {
-            FileUtils.moveDirectory(filesDir, getRepositoryFilesDir(newUserName, newRepositoryName))
+            FileUtils.moveDirectory(filesDir, directory.getRepositoryFilesDir(newUserName, newRepositoryName))
           }
           // Delete parent directory
-          FileUtil.deleteDirectoryIfEmpty(getRepositoryFilesDir(oldUserName, oldRepositoryName))
+          FileUtil.deleteDirectoryIfEmpty(directory.getRepositoryFilesDir(oldUserName, oldRepositoryName))
 
           // Call hooks
           if (oldUserName == newUserName) {
@@ -126,11 +125,11 @@ trait RepositoryService {
     LockUtil.lock(s"${repository.userName}/${repository.repositoryName}") {
       deleteRepositoryOnModel(repository.userName, repository.repositoryName)
 
-      FileUtil.deleteRecursively(getRepositoryDir(repository.userName, repository.repositoryName))
+      FileUtil.deleteRecursively(directory.getRepositoryDir(repository.userName, repository.repositoryName))
 
-      FileUtil.deleteRecursively(getWikiRepositoryDir(repository.userName, repository.repositoryName))
-      FileUtil.deleteRecursively(getTemporaryDir(repository.userName, repository.repositoryName))
-      FileUtil.deleteRecursively(getRepositoryFilesDir(repository.userName, repository.repositoryName))
+      FileUtil.deleteRecursively(directory.getWikiRepositoryDir(repository.userName, repository.repositoryName))
+      FileUtil.deleteRecursively(directory.getTemporaryDir(repository.userName, repository.repositoryName))
+      FileUtil.deleteRecursively(directory.getRepositoryFilesDir(repository.userName, repository.repositoryName))
 
       // Call hooks
       PluginRegistry().getRepositoryHooks.foreach(_.deleted(repository.userName, repository.repositoryName))
@@ -634,7 +633,7 @@ trait RepositoryService {
         }
 
     // Get template file from project root. When didn't find, will lookup default folder.
-    Using.resource(Git.open(Directory.getRepositoryDir(repository.owner, repository.name))) { git =>
+    Using.resource(Git.open(directory.getRepositoryDir(repository.owner, repository.name))) { git =>
       // maxFiles = 1 means not get commit info because the only objectId and filename are necessary here
       choiceTemplate(JGitUtil.getFileList(git, repository.repository.defaultBranch, ".", maxFiles = 1))
         .orElse {

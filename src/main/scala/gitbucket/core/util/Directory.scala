@@ -3,11 +3,15 @@ package gitbucket.core.util
 import java.io.File
 
 /**
- * Provides directory locations used by GitBucket.
+ * Resolves the default `gitbucket.home` the same way `Directory` always has: the
+ * `-Dgitbucket.home=<path>` system property, then the `GITBUCKET_HOME` environment variable,
+ * then the legacy `~/gitbucket` directory if it already exists, then `~/.gitbucket`.
+ *
+ * Kept outside `Directory` so the companion object below can call it while constructing its own
+ * `Directory` superclass instance, before `Directory`'s own members are available.
  */
-object Directory {
-
-  val GitBucketHome = (System.getProperty("gitbucket.home") match {
+private[util] object DirectoryHomeResolver {
+  def resolveDefault(): String = (System.getProperty("gitbucket.home") match {
     // -Dgitbucket.home=<path>
     case path if (path != null) => new File(path)
     case _                      =>
@@ -26,6 +30,17 @@ object Directory {
         }
       }
   }).getAbsolutePath
+}
+
+/**
+ * Provides directory locations used by GitBucket, rooted at `GitBucketHome`.
+ *
+ * Instantiable (rather than a plain singleton `object`) so tests can construct an isolated
+ * `Directory` pointed at a unique temporary directory instead of sharing the one JVM-wide home
+ * directory. The companion `object Directory` below preserves the previous singleton behavior
+ * for all existing production call sites.
+ */
+class Directory(val GitBucketHome: String) {
 
   val GitBucketConf = new File(GitBucketHome, "gitbucket.conf")
 
@@ -106,3 +121,9 @@ object Directory {
     new File(s"${RepositoryHome}/${owner}/${repository}.wiki.git")
 
 }
+
+/**
+ * The JVM-wide default `Directory`, resolved from `-Dgitbucket.home` / `GITBUCKET_HOME` / the
+ * user's home directory, exactly as `Directory` behaved before it became instantiable.
+ */
+object Directory extends Directory(DirectoryHomeResolver.resolveDefault())
