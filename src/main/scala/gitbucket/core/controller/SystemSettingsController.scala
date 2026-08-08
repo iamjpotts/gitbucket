@@ -19,7 +19,7 @@ import org.scalatra.i18n.Messages
 import scala.collection.mutable.ListBuffer
 import scala.util.Using
 
-class SystemSettingsController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class SystemSettingsController(override protected val directory: Directory)
     extends SystemSettingsControllerBase
     with AccountService
     with RepositoryService

@@ -36,7 +36,7 @@ import org.json4s.jackson.Serialization
 import org.scalatra.*
 import org.scalatra.i18n.Messages
 
-class RepositoryViewerController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class RepositoryViewerController(override protected val directory: Directory)
     extends RepositoryViewerControllerBase
     with RepositoryService
     with RepositoryCommitFileService

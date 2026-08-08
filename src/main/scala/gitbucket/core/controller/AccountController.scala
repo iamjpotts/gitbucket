@@ -17,7 +17,7 @@ import org.scalatra.BadRequest
 import org.scalatra.forms._
 import org.scalatra.Forbidden
 
-class AccountController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class AccountController(override protected val directory: Directory)
     extends AccountControllerBase
     with AccountService
     with RepositoryService

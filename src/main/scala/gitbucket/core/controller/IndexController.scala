@@ -16,7 +16,7 @@ import org.scalatra.forms.*
 import gitbucket.core.service.ActivityService.*
 import gitbucket.core.view.helpers
 
-class IndexController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class IndexController(override protected val directory: Directory)
     extends IndexControllerBase
     with RepositoryService
     with ActivityService

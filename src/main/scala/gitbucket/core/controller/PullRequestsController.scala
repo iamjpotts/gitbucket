@@ -16,7 +16,7 @@ import org.scalatra.BadRequest
 
 import scala.util.Using
 
-class PullRequestsController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class PullRequestsController(override protected val directory: Directory)
     extends PullRequestsControllerBase
     with RepositoryService
     with AccountService

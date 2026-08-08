@@ -4,8 +4,7 @@ import gitbucket.core.plugin.PluginRegistry
 import gitbucket.core.util.Directory
 import org.scalatra.MovedPermanently
 
-class PreProcessController(override protected val directory: Directory = gitbucket.core.util.Directory)
-    extends PreProcessControllerBase
+class PreProcessController(override protected val directory: Directory) extends PreProcessControllerBase
 
 trait PreProcessControllerBase extends ControllerBase {
 

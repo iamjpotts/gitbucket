@@ -10,7 +10,7 @@ import gitbucket.core.view.helpers
 import org.scalatra.forms.*
 import org.scalatra.{BadRequest, Ok}
 
-class IssuesController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class IssuesController(override protected val directory: Directory)
     extends IssuesControllerBase
     with IssuesService
     with RepositoryService

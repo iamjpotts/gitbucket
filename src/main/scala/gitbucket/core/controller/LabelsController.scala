@@ -16,7 +16,7 @@ import org.scalatra.forms.*
 import org.scalatra.i18n.Messages
 import org.scalatra.Ok
 
-class LabelsController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class LabelsController(override protected val directory: Directory)
     extends LabelsControllerBase
     with IssuesService
     with RepositoryService

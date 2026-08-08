@@ -8,7 +8,7 @@ import gitbucket.core.util.Implicits.*
 import gitbucket.core.service.IssuesService.*
 import gitbucket.core.service.ActivityService.*
 
-class DashboardController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class DashboardController(override protected val directory: Directory)
     extends DashboardControllerBase
     with IssuesService
     with MergeService

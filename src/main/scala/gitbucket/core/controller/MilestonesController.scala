@@ -16,7 +16,7 @@ import gitbucket.core.view.helpers.{getAssignableUserNames, getLabels, getPriori
 import org.scalatra.forms.*
 import org.scalatra.i18n.Messages
 
-class MilestonesController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class MilestonesController(override protected val directory: Directory)
     extends MilestonesControllerBase
     with MilestonesService
     with RepositoryService

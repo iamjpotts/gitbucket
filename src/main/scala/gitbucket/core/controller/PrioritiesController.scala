@@ -16,7 +16,7 @@ import org.scalatra.forms._
 import org.scalatra.i18n.Messages
 import org.scalatra.Ok
 
-class PrioritiesController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class PrioritiesController(override protected val directory: Directory)
     extends PrioritiesControllerBase
     with IssuesService
     with RepositoryService

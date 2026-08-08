@@ -23,7 +23,7 @@ import slick.jdbc.JdbcBackend.Session
  *
  * This servlet saves uploaded file.
  */
-class FileUploadController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class FileUploadController(override protected val directory: Directory)
     extends ScalatraServlet
     with FileUploadSupport
     with RepositoryService

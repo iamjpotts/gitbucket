@@ -21,7 +21,7 @@ import org.eclipse.jgit.lib.ObjectId
 import scala.util.Using
 import org.scalatra.{Forbidden, Ok}
 
-class RepositorySettingsController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class RepositorySettingsController(override protected val directory: Directory)
     extends RepositorySettingsControllerBase
     with RepositoryService
     with AccountService

@@ -20,7 +20,7 @@ import org.eclipse.jgit.api.Git
 
 import scala.util.Using
 
-class ReleaseController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class ReleaseController(override protected val directory: Directory)
     extends ReleaseControllerBase
     with RepositoryService
     with AccountService

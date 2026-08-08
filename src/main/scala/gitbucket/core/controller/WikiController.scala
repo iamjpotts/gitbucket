@@ -16,7 +16,7 @@ import org.scalatra.i18n.Messages
 
 import scala.util.Using
 
-class WikiController(override protected val directory: Directory = gitbucket.core.util.Directory)
+class WikiController(override protected val directory: Directory)
     extends WikiControllerBase
     with WikiService
     with RepositoryService
