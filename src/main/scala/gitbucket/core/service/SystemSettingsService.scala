@@ -10,108 +10,7 @@ import gitbucket.core.util.DirectoryProvider
 
 import scala.util.Using
 
-trait SystemSettingsService extends DirectoryProvider {
-
-  def baseUrl(implicit request: HttpServletRequest): String = loadSystemSettings().baseUrl(request)
-
-  def saveSystemSettings(settings: SystemSettings): Unit = {
-    val props = new java.util.Properties()
-    settings.baseUrl.foreach(x => props.setProperty(BaseURL, x.replaceFirst("/\\Z", "")))
-    settings.information.foreach(x => props.setProperty(Information, x))
-    props.setProperty(AllowAccountRegistration, settings.basicBehavior.allowAccountRegistration.toString)
-    props.setProperty(AllowResetPassword, settings.basicBehavior.allowResetPassword.toString)
-    props.setProperty(ResetPasswordTokenExpiration, settings.basicBehavior.resetPasswordTokenExpiration.toString)
-    props.setProperty(AllowAnonymousAccess, settings.basicBehavior.allowAnonymousAccess.toString)
-    props.setProperty(IsCreateRepoOptionPublic, settings.basicBehavior.isCreateRepoOptionPublic.toString)
-    props.setProperty(AllowCreateRepositoryByClone, settings.basicBehavior.allowCreateRepositoryByClone.toString)
-    props.setProperty(RepositoryOperationCreate, settings.basicBehavior.repositoryOperation.create.toString)
-    props.setProperty(RepositoryOperationDelete, settings.basicBehavior.repositoryOperation.delete.toString)
-    props.setProperty(RepositoryOperationRename, settings.basicBehavior.repositoryOperation.rename.toString)
-    props.setProperty(RepositoryOperationTransfer, settings.basicBehavior.repositoryOperation.transfer.toString)
-    props.setProperty(RepositoryOperationFork, settings.basicBehavior.repositoryOperation.fork.toString)
-    props.setProperty(Gravatar, settings.basicBehavior.gravatar.toString)
-    props.setProperty(Notification, settings.basicBehavior.notification.toString)
-    props.setProperty(LimitVisibleRepositories, settings.basicBehavior.limitVisibleRepositories.toString)
-    props.setProperty(CompareNoCheckByDefault, settings.basicBehavior.compareNoCheckByDefault.toString)
-    props.setProperty(SshEnabled, settings.ssh.enabled.toString)
-    settings.ssh.bindAddress.foreach { bindAddress =>
-      props.setProperty(SshBindAddressHost, bindAddress.host.trim())
-      props.setProperty(SshBindAddressPort, bindAddress.port.toString)
-    }
-    settings.ssh.publicAddress.foreach { publicAddress =>
-      props.setProperty(SshPublicAddressHost, publicAddress.host.trim())
-      props.setProperty(SshPublicAddressPort, publicAddress.port.toString)
-    }
-    props.setProperty(UseSMTP, settings.useSMTP.toString)
-    if (settings.useSMTP) {
-      settings.smtp.foreach { smtp =>
-        props.setProperty(SmtpHost, smtp.host)
-        smtp.port.foreach(x => props.setProperty(SmtpPort, x.toString))
-        smtp.user.foreach(props.setProperty(SmtpUser, _))
-        smtp.password.foreach(props.setProperty(SmtpPassword, _))
-        smtp.ssl.foreach(x => props.setProperty(SmtpSsl, x.toString))
-        smtp.starttls.foreach(x => props.setProperty(SmtpStarttls, x.toString))
-        smtp.fromAddress.foreach(props.setProperty(SmtpFromAddress, _))
-        smtp.fromName.foreach(props.setProperty(SmtpFromName, _))
-      }
-    }
-    props.setProperty(LdapAuthentication, settings.ldapAuthentication.toString)
-    if (settings.ldapAuthentication) {
-      settings.ldap.foreach { ldap =>
-        props.setProperty(LdapHost, ldap.host)
-        ldap.port.foreach(x => props.setProperty(LdapPort, x.toString))
-        ldap.bindDN.foreach(x => props.setProperty(LdapBindDN, x))
-        ldap.bindPassword.foreach(x => props.setProperty(LdapBindPassword, x))
-        props.setProperty(LdapBaseDN, ldap.baseDN)
-        props.setProperty(LdapUserNameAttribute, ldap.userNameAttribute)
-        ldap.additionalFilterCondition.foreach(x => props.setProperty(LdapAdditionalFilterCondition, x))
-        ldap.fullNameAttribute.foreach(x => props.setProperty(LdapFullNameAttribute, x))
-        ldap.mailAttribute.foreach(x => props.setProperty(LdapMailAddressAttribute, x))
-        ldap.tls.foreach(x => props.setProperty(LdapTls, x.toString))
-        ldap.ssl.foreach(x => props.setProperty(LdapSsl, x.toString))
-        ldap.keystore.foreach(x => props.setProperty(LdapKeystore, x))
-      }
-    }
-    props.setProperty(OidcAuthentication, settings.oidcAuthentication.toString)
-    if (settings.oidcAuthentication) {
-      settings.oidc.foreach { oidc =>
-        props.setProperty(OidcIssuer, oidc.issuer.getValue)
-        props.setProperty(OidcClientId, oidc.clientID.getValue)
-        props.setProperty(OidcClientSecret, oidc.clientSecret.getValue)
-        oidc.jwsAlgorithm.foreach { x =>
-          props.setProperty(OidcJwsAlgorithm, x.getName)
-        }
-      }
-    }
-    props.setProperty(SkinName, settings.skinName)
-    settings.userDefinedCss.foreach(x => props.setProperty(UserDefinedCss, x))
-    props.setProperty(ShowMailAddress, settings.showMailAddress.toString)
-    props.setProperty(WebHookBlockPrivateAddress, settings.webHook.blockPrivateAddress.toString)
-    props.setProperty(WebHookWhitelist, settings.webHook.whitelist.mkString("\n"))
-    props.setProperty(UploadMaxFileSize, settings.upload.maxFileSize.toString)
-    props.setProperty(UploadTimeout, settings.upload.timeout.toString)
-    props.setProperty(UploadLargeMaxFileSize, settings.upload.largeMaxFileSize.toString)
-    props.setProperty(UploadLargeTimeout, settings.upload.largeTimeout.toString)
-    props.setProperty(RepositoryViewerMaxFiles, settings.repositoryViewer.maxFiles.toString)
-    props.setProperty(RepositoryViewerMaxDiffFiles, settings.repositoryViewer.maxDiffFiles.toString)
-    props.setProperty(RepositoryViewerMaxDiffLines, settings.repositoryViewer.maxDiffLines.toString)
-    props.setProperty(DefaultBranch, settings.defaultBranch)
-    props.setProperty(ShowFullName, settings.showFullName.toString)
-
-    Using.resource(new java.io.FileOutputStream(directory.GitBucketConf)) { out =>
-      props.store(out, null)
-    }
-  }
-
-  def loadSystemSettings(): SystemSettings = {
-    val props = new java.util.Properties()
-    if (directory.GitBucketConf.exists) {
-      Using.resource(new java.io.FileInputStream(directory.GitBucketConf)) { in =>
-        props.load(in)
-      }
-    }
-    loadSystemSettings(props)
-  }
+trait SystemSettingsService {
 
   def loadSystemSettings(props: java.util.Properties): SystemSettings = {
     SystemSettings(
@@ -221,6 +120,120 @@ trait SystemSettingsService extends DirectoryProvider {
       getValue(props, DefaultBranch, "main"),
       getValue(props, ShowFullName, false)
     )
+  }
+
+  def toProperties(settings: SystemSettings): java.util.Properties = {
+    val props = new java.util.Properties()
+    settings.baseUrl.foreach(x => props.setProperty(BaseURL, x.replaceFirst("/\\Z", "")))
+    settings.information.foreach(x => props.setProperty(Information, x))
+    props.setProperty(AllowAccountRegistration, settings.basicBehavior.allowAccountRegistration.toString)
+    props.setProperty(AllowResetPassword, settings.basicBehavior.allowResetPassword.toString)
+    props.setProperty(ResetPasswordTokenExpiration, settings.basicBehavior.resetPasswordTokenExpiration.toString)
+    props.setProperty(AllowAnonymousAccess, settings.basicBehavior.allowAnonymousAccess.toString)
+    props.setProperty(IsCreateRepoOptionPublic, settings.basicBehavior.isCreateRepoOptionPublic.toString)
+    props.setProperty(AllowCreateRepositoryByClone, settings.basicBehavior.allowCreateRepositoryByClone.toString)
+    props.setProperty(RepositoryOperationCreate, settings.basicBehavior.repositoryOperation.create.toString)
+    props.setProperty(RepositoryOperationDelete, settings.basicBehavior.repositoryOperation.delete.toString)
+    props.setProperty(RepositoryOperationRename, settings.basicBehavior.repositoryOperation.rename.toString)
+    props.setProperty(RepositoryOperationTransfer, settings.basicBehavior.repositoryOperation.transfer.toString)
+    props.setProperty(RepositoryOperationFork, settings.basicBehavior.repositoryOperation.fork.toString)
+    props.setProperty(Gravatar, settings.basicBehavior.gravatar.toString)
+    props.setProperty(Notification, settings.basicBehavior.notification.toString)
+    props.setProperty(LimitVisibleRepositories, settings.basicBehavior.limitVisibleRepositories.toString)
+    props.setProperty(CompareNoCheckByDefault, settings.basicBehavior.compareNoCheckByDefault.toString)
+    props.setProperty(SshEnabled, settings.ssh.enabled.toString)
+    settings.ssh.bindAddress.foreach { bindAddress =>
+      props.setProperty(SshBindAddressHost, bindAddress.host.trim())
+      props.setProperty(SshBindAddressPort, bindAddress.port.toString)
+    }
+    settings.ssh.publicAddress.foreach { publicAddress =>
+      props.setProperty(SshPublicAddressHost, publicAddress.host.trim())
+      props.setProperty(SshPublicAddressPort, publicAddress.port.toString)
+    }
+    props.setProperty(UseSMTP, settings.useSMTP.toString)
+    if (settings.useSMTP) {
+      settings.smtp.foreach { smtp =>
+        props.setProperty(SmtpHost, smtp.host)
+        smtp.port.foreach(x => props.setProperty(SmtpPort, x.toString))
+        smtp.user.foreach(props.setProperty(SmtpUser, _))
+        smtp.password.foreach(props.setProperty(SmtpPassword, _))
+        smtp.ssl.foreach(x => props.setProperty(SmtpSsl, x.toString))
+        smtp.starttls.foreach(x => props.setProperty(SmtpStarttls, x.toString))
+        smtp.fromAddress.foreach(props.setProperty(SmtpFromAddress, _))
+        smtp.fromName.foreach(props.setProperty(SmtpFromName, _))
+      }
+    }
+    props.setProperty(LdapAuthentication, settings.ldapAuthentication.toString)
+    if (settings.ldapAuthentication) {
+      settings.ldap.foreach { ldap =>
+        props.setProperty(LdapHost, ldap.host)
+        ldap.port.foreach(x => props.setProperty(LdapPort, x.toString))
+        ldap.bindDN.foreach(x => props.setProperty(LdapBindDN, x))
+        ldap.bindPassword.foreach(x => props.setProperty(LdapBindPassword, x))
+        props.setProperty(LdapBaseDN, ldap.baseDN)
+        props.setProperty(LdapUserNameAttribute, ldap.userNameAttribute)
+        ldap.additionalFilterCondition.foreach(x => props.setProperty(LdapAdditionalFilterCondition, x))
+        ldap.fullNameAttribute.foreach(x => props.setProperty(LdapFullNameAttribute, x))
+        ldap.mailAttribute.foreach(x => props.setProperty(LdapMailAddressAttribute, x))
+        ldap.tls.foreach(x => props.setProperty(LdapTls, x.toString))
+        ldap.ssl.foreach(x => props.setProperty(LdapSsl, x.toString))
+        ldap.keystore.foreach(x => props.setProperty(LdapKeystore, x))
+      }
+    }
+    props.setProperty(OidcAuthentication, settings.oidcAuthentication.toString)
+    if (settings.oidcAuthentication) {
+      settings.oidc.foreach { oidc =>
+        props.setProperty(OidcIssuer, oidc.issuer.getValue)
+        props.setProperty(OidcClientId, oidc.clientID.getValue)
+        props.setProperty(OidcClientSecret, oidc.clientSecret.getValue)
+        oidc.jwsAlgorithm.foreach { x =>
+          props.setProperty(OidcJwsAlgorithm, x.getName)
+        }
+      }
+    }
+    props.setProperty(SkinName, settings.skinName)
+    settings.userDefinedCss.foreach(x => props.setProperty(UserDefinedCss, x))
+    props.setProperty(ShowMailAddress, settings.showMailAddress.toString)
+    props.setProperty(WebHookBlockPrivateAddress, settings.webHook.blockPrivateAddress.toString)
+    props.setProperty(WebHookWhitelist, settings.webHook.whitelist.mkString("\n"))
+    props.setProperty(UploadMaxFileSize, settings.upload.maxFileSize.toString)
+    props.setProperty(UploadTimeout, settings.upload.timeout.toString)
+    props.setProperty(UploadLargeMaxFileSize, settings.upload.largeMaxFileSize.toString)
+    props.setProperty(UploadLargeTimeout, settings.upload.largeTimeout.toString)
+    props.setProperty(RepositoryViewerMaxFiles, settings.repositoryViewer.maxFiles.toString)
+    props.setProperty(RepositoryViewerMaxDiffFiles, settings.repositoryViewer.maxDiffFiles.toString)
+    props.setProperty(RepositoryViewerMaxDiffLines, settings.repositoryViewer.maxDiffLines.toString)
+    props.setProperty(DefaultBranch, settings.defaultBranch)
+    props.setProperty(ShowFullName, settings.showFullName.toString)
+    props
+  }
+}
+
+/**
+ * Reads and writes `SystemSettings` from/to the `gitbucket.conf` file on disk. Split out of
+ * `SystemSettingsService` (rather than folded into it) so that code which only needs the
+ * `SystemSettings` model or in-memory parsing (`loadSystemSettings(props)`) doesn't have to pull
+ * in `DirectoryProvider` along with it — only the things that truly do config-file I/O mix this in.
+ */
+trait SystemSettingsFileService extends DirectoryProvider {
+  self: SystemSettingsService =>
+
+  def baseUrl(implicit request: HttpServletRequest): String = loadSystemSettings().baseUrl(request)
+
+  def saveSystemSettings(settings: SystemSettings): Unit = {
+    Using.resource(new java.io.FileOutputStream(directory.GitBucketConf)) { out =>
+      toProperties(settings).store(out, null)
+    }
+  }
+
+  def loadSystemSettings(): SystemSettings = {
+    val props = new java.util.Properties()
+    if (directory.GitBucketConf.exists) {
+      Using.resource(new java.io.FileInputStream(directory.GitBucketConf)) { in =>
+        props.load(in)
+      }
+    }
+    loadSystemSettings(props)
   }
 }
 

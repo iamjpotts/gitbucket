@@ -3,7 +3,7 @@ package gitbucket.core.controller
 import java.io.{File, FileInputStream, FileOutputStream}
 import gitbucket.core.api.{ApiError, JsonFormat}
 import gitbucket.core.model.Account
-import gitbucket.core.service.{AccountService, RepositoryService, SystemSettingsService}
+import gitbucket.core.service.{AccountService, RepositoryService, SystemSettingsFileService, SystemSettingsService}
 import gitbucket.core.util.SyntaxSugars.*
 import gitbucket.core.util.Implicits.*
 import gitbucket.core.util.*
@@ -42,6 +42,7 @@ abstract class ControllerBase
     with FlashMapSupport
     with Validations
     with SystemSettingsService
+    with SystemSettingsFileService
     with DirectoryProvider {
 
   private val logger = LoggerFactory.getLogger(getClass)

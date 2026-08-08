@@ -2,12 +2,12 @@ import java.util.EnumSet
 import javax.servlet._
 
 import gitbucket.core.controller.{ReleaseController, _}
-import gitbucket.core.service.SystemSettingsService
+import gitbucket.core.service.{SystemSettingsFileService, SystemSettingsService}
 import gitbucket.core.servlet._
 import gitbucket.core.util.Directory
 import org.scalatra._
 
-class ScalatraBootstrap extends LifeCycle with SystemSettingsService {
+class ScalatraBootstrap extends LifeCycle with SystemSettingsService with SystemSettingsFileService {
   override def init(context: ServletContext): Unit = {
 
     val settings = loadSystemSettings()

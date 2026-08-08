@@ -4,7 +4,7 @@ import java.io.{File, FileOutputStream}
 
 import gitbucket.core.GitBucketCoreModule
 import gitbucket.core.plugin.PluginRegistry
-import gitbucket.core.service.SystemSettingsService
+import gitbucket.core.service.{SystemSettingsFileService, SystemSettingsService}
 import gitbucket.core.util.DatabaseConfig
 import gitbucket.core.util.Directory.*
 import gitbucket.core.util.JDBCUtil.*
@@ -27,7 +27,7 @@ import scala.util.Using
  * Initialize GitBucket system.
  * Update database schema and load plug-ins automatically in the context initializing.
  */
-class InitializeListener extends ServletContextListener with SystemSettingsService {
+class InitializeListener extends ServletContextListener with SystemSettingsService with SystemSettingsFileService {
 
   private val logger = LoggerFactory.getLogger(classOf[InitializeListener])
 

@@ -2,7 +2,13 @@ package gitbucket.core.ssh
 
 import gitbucket.core.model.Profile.profile.blockingApi._
 import gitbucket.core.plugin.{GitRepositoryRouting, PluginRegistry}
-import gitbucket.core.service.{AccountService, DeployKeyService, RepositoryService, SystemSettingsService}
+import gitbucket.core.service.{
+  AccountService,
+  DeployKeyService,
+  RepositoryService,
+  SystemSettingsFileService,
+  SystemSettingsService
+}
 import gitbucket.core.servlet.{CommitLogHook, Database}
 import gitbucket.core.util.Directory
 import org.apache.sshd.server.{Environment, ExitCallback}
@@ -195,7 +201,8 @@ class DefaultGitReceivePack(owner: String, repoName: String, baseUrl: String, ss
 
 class PluginGitUploadPack(repoName: String, routing: GitRepositoryRouting)
     extends GitCommand
-    with SystemSettingsService {
+    with SystemSettingsService
+    with SystemSettingsFileService {
 
   override protected def runTask(authType: AuthType): Unit = {
     val execute = Database() withSession { implicit session =>
@@ -215,7 +222,8 @@ class PluginGitUploadPack(repoName: String, routing: GitRepositoryRouting)
 
 class PluginGitReceivePack(repoName: String, routing: GitRepositoryRouting)
     extends GitCommand
-    with SystemSettingsService {
+    with SystemSettingsService
+    with SystemSettingsFileService {
 
   override protected def runTask(authType: AuthType): Unit = {
     val execute = Database() withSession { implicit session =>

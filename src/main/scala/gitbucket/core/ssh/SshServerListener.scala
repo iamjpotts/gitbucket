@@ -2,6 +2,7 @@ package gitbucket.core.ssh
 
 import java.util.concurrent.atomic.AtomicReference
 import javax.servlet.{ServletContextEvent, ServletContextListener}
+import gitbucket.core.service.SystemSettingsFileService
 import gitbucket.core.service.SystemSettingsService
 import gitbucket.core.service.SystemSettingsService.SshAddress
 import gitbucket.core.util.Directory
@@ -60,7 +61,7 @@ object SshServer {
  * How to use:
  * git clone ssh://username@host_or_ip:29418/owner/repository_name.git
  */
-class SshServerListener extends ServletContextListener with SystemSettingsService {
+class SshServerListener extends ServletContextListener with SystemSettingsService with SystemSettingsFileService {
 
   private val logger = LoggerFactory.getLogger(classOf[SshServerListener])
 

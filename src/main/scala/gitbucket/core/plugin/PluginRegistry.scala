@@ -12,6 +12,7 @@ import gitbucket.core.controller.{Context, ControllerBase}
 import gitbucket.core.model.{Account, Issue}
 import gitbucket.core.service.ProtectedBranchService.ProtectedBranchReceiveHook
 import gitbucket.core.service.RepositoryService.RepositoryInfo
+import gitbucket.core.service.SystemSettingsFileService
 import gitbucket.core.service.SystemSettingsService
 import gitbucket.core.service.SystemSettingsService.SystemSettings
 import gitbucket.core.util.{ConfigUtil, DatabaseConfig}
@@ -410,7 +411,10 @@ case class PluginInfo(
   classLoader: URLClassLoader
 ) extends PluginInfoBase(pluginId, pluginName, pluginVersion, gitbucketVersion, description)
 
-class PluginWatchThread(context: ServletContext, dir: String) extends Thread with SystemSettingsService {
+class PluginWatchThread(context: ServletContext, dir: String)
+    extends Thread
+    with SystemSettingsService
+    with SystemSettingsFileService {
   import gitbucket.core.model.Profile.profile.blockingApi._
 
   private val logger = LoggerFactory.getLogger(classOf[PluginWatchThread])

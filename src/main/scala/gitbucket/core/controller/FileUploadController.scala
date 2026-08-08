@@ -15,7 +15,7 @@ import org.scalatra.servlet.{FileItem, FileUploadSupport, MultipartConfig}
 import org.apache.commons.io.{FileUtils, IOUtils}
 
 import scala.util.Using
-import gitbucket.core.service.SystemSettingsService
+import gitbucket.core.service.{SystemSettingsFileService, SystemSettingsService}
 import slick.jdbc.JdbcBackend.Session
 
 /**
@@ -29,7 +29,8 @@ class FileUploadController(override protected val directory: Directory)
     with RepositoryService
     with AccountService
     with ReleaseService
-    with SystemSettingsService {
+    with SystemSettingsService
+    with SystemSettingsFileService {
 
   post("/image") {
     setMultipartConfig()

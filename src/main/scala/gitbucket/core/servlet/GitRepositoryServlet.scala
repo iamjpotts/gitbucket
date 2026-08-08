@@ -51,7 +51,7 @@ import org.json4s.jackson.Serialization.*
  * This servlet provides only Git repository functionality.
  * Authentication is provided by [[GitAuthenticationFilter]].
  */
-class GitRepositoryServlet extends GitServlet with SystemSettingsService {
+class GitRepositoryServlet extends GitServlet with SystemSettingsService with SystemSettingsFileService {
 
   private implicit val jsonFormats: Formats = gitbucket.core.api.JsonFormat.jsonFormats
 
@@ -183,7 +183,10 @@ class GitBucketRepositoryResolver extends RepositoryResolver[HttpServletRequest]
 
 }
 
-class GitBucketReceivePackFactory extends ReceivePackFactory[HttpServletRequest] with SystemSettingsService {
+class GitBucketReceivePackFactory
+    extends ReceivePackFactory[HttpServletRequest]
+    with SystemSettingsService
+    with SystemSettingsFileService {
 
   private val logger = LoggerFactory.getLogger(classOf[GitBucketReceivePackFactory])
 
@@ -242,6 +245,7 @@ class CommitLogHook(owner: String, repository: String, pusher: String, baseUrl: 
     with WebHookPullRequestReviewCommentService
     with CommitsService
     with SystemSettingsService
+    with SystemSettingsFileService
     with ProtectedBranchService
     with RequestCache {
 
@@ -476,6 +480,7 @@ class WikiCommitHook(owner: String, repository: String, pusher: String, baseUrl:
     with RepositoryService
     with ActivityService
     with SystemSettingsService
+    with SystemSettingsFileService
     with RequestCache {
 
   private val logger = LoggerFactory.getLogger(classOf[WikiCommitHook])

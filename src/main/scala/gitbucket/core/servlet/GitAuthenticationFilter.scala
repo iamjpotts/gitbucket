@@ -6,7 +6,13 @@ import javax.servlet.http._
 import gitbucket.core.model.Account
 import gitbucket.core.plugin.{GitRepositoryFilter, GitRepositoryRouting, PluginRegistry}
 import gitbucket.core.service.SystemSettingsService.SystemSettings
-import gitbucket.core.service.{AccessTokenService, AccountService, RepositoryService, SystemSettingsService}
+import gitbucket.core.service.{
+  AccessTokenService,
+  AccountService,
+  RepositoryService,
+  SystemSettingsFileService,
+  SystemSettingsService
+}
 import gitbucket.core.util.Implicits._
 import gitbucket.core.util.{AuthUtil, Keys}
 import gitbucket.core.model.Profile.profile.blockingApi._
@@ -19,7 +25,12 @@ import org.slf4j.LoggerFactory
 /**
  * Provides BASIC Authentication for [[GitRepositoryServlet]].
  */
-class GitAuthenticationFilter extends Filter with RepositoryService with AccountService with SystemSettingsService {
+class GitAuthenticationFilter
+    extends Filter
+    with RepositoryService
+    with AccountService
+    with SystemSettingsService
+    with SystemSettingsFileService {
 
   private val logger = LoggerFactory.getLogger(classOf[GitAuthenticationFilter])
 
