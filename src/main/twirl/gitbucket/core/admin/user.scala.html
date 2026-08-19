@@ -97,6 +97,23 @@
         <a href="@context.path/admin/users" class="btn btn-default">Cancel</a>
       </fieldset>
     </form>
+    @if(account.isDefined){
+      <form id="rename-form" method="post" action="@context.path/admin/users/@account.get.userName/_rename" validate="true" autocomplete="off">
+        <fieldset class="border-top form-group">
+          <label for="newUserName" class="strong">Rename user:</label>
+          <div>
+            Rename this user. This will make the user's current URL unavailable.
+            <div class="pull-right">
+              <input type="text" name="newUserName" id="newUserName" class="form-control" style="width: 200px; display: inline; vertical-align: middle;" value="@account.get.userName" aria-label="New user name"/>
+              <input type="submit" class="btn btn-danger" value="Rename"/>
+              <div>
+                <span id="error-newUserName" class="error"></span>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+      </form>
+    }
   }
 }
 <script>
@@ -106,6 +123,13 @@ $(function(){
   $('#update').click(function(){
     if($('#password').val() != ''){
       return confirm('Are you sure you want to change password of this user?');
+    } else {
+      return true;
+    }
+  });
+  $('#rename-form').submit(function(){
+    if($('#rename-form').data('validated') === true){
+      return confirm('Rename this user as you entered. The user\'s current URL will be unavailable.\nAre you sure?');
     } else {
       return true;
     }
